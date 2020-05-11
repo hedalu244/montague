@@ -40,7 +40,7 @@ type TypeValue<T extends Type> =
 type Assignment = <B extends Type>(_: Variable<B>) => TypeValue<B>;
 
 // g_[x/d]
-function assign<A extends Type>(
+function replaceAssign<A extends Type>(
     g: Assignment,
     variable: Variable<A>,
     value: TypeValue<A>): Assignment {
@@ -77,7 +77,7 @@ interface Formula<A extends Type> {
     // 指定の変数を探して指定の置き換え式を代入する
     replace<B extends Type>(search: Variable<B>, replacer: Formula<B>): Formula<A>;
     // λ簡約、↓↑打ち消し
-    reduction(): Formula<A>;
+    reduce(): Formula<A>;
 }
 
 class Variable<A extends Type> implements Formula<A> {
@@ -98,7 +98,7 @@ class Variable<A extends Type> implements Formula<A> {
         if (this.name === search.name) return replacer;
         else return this;
     }
-    reduction(): Formula<A> {
+    reduce(): Formula<A> {
         return this;
     }
     toString() {
@@ -124,7 +124,7 @@ class Constant<A extends Type> implements Formula<A> {
     replace<B extends Type>(search: Variable<B>, replacer: Formula<B>): Formula<A> {
         return this;
     }
-    reduction(): Formula<A> {
+    reduce(): Formula<A> {
         return this;
     }
     toString() {
@@ -147,7 +147,7 @@ class Not implements Formula<"t"> {
     replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<"t"> {
         return new Not(this.formula.replace(search, replacer));
     }
-    reduction(): Formula<"t"> {
+    reduce(): Formula<"t"> {
         return new Not(this.formula);
     }
     toString() {
@@ -172,7 +172,7 @@ class And implements Formula<"t"> {
     replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<"t"> {
         return new And(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
     }
-    reduction(): Formula<"t"> {
+    reduce(): Formula<"t"> {
         return new And(this.formula0, this.formula1);
     }
     toString() {
@@ -197,7 +197,7 @@ class Or implements Formula<"t"> {
     replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<"t"> {
         return new Or(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
     }
-    reduction(): Formula<"t"> {
+    reduce(): Formula<"t"> {
         return new Or(this.formula0, this.formula1);
     }
     toString() {
@@ -222,7 +222,7 @@ class If implements Formula<"t"> {
     replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<"t"> {
         return new If(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
     }
-    reduction(): Formula<"t"> {
+    reduce(): Formula<"t"> {
         return new If(this.formula0, this.formula1);
     }
     toString() {
@@ -247,7 +247,7 @@ class Iff implements Formula<"t"> {
     replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<"t"> {
         return new Iff(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
     }
-    reduction(): Formula<"t"> {
+    reduce(): Formula<"t"> {
         return new Iff(this.formula0, this.formula1);
     }
     toString() {
@@ -272,7 +272,7 @@ class Equal<A extends Type> implements Formula<"t"> {
     replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<"t"> {
         return new Equal(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
     }
-    reduction(): Formula<"t"> {
+    reduce(): Formula<"t"> {
         return new Equal(this.formula0, this.formula1);
     }
     toString() {
@@ -289,7 +289,7 @@ class Exist<A extends Type> implements Formula<"t"> {
         this.formula = formula;
     };
     valuation(m: Model, w: Situation, g: Assignment): Truth {
-        return new Truth(m.interpretationDomain(this.variable.type).some(value => this.formula.valuation(m, w, assign(g, this.variable, value)).value));
+        return new Truth(m.interpretationDomain(this.variable.type).some(value => this.formula.valuation(m, w, replaceAssign(g, this.variable, value)).value));
     };
     freeVariables(): Variable<Type>[] {
         return this.formula.freeVariables().filter(x => x.name !== this.variable.name);
@@ -309,7 +309,7 @@ class Exist<A extends Type> implements Formula<"t"> {
         //問題なければそのまま再帰
         return new Exist(this.variable, this.formula.replace(search, replacer));
     }
-    reduction(): Formula<"t"> {
+    reduce(): Formula<"t"> {
         return new Exist(this.variable, this.formula);
     }
     toString() {
@@ -326,7 +326,7 @@ class All<A extends Type> implements Formula<"t"> {
         this.formula = formula;
     };
     valuation(m: Model, w: Situation, g: Assignment): Truth {
-        return new Truth(m.interpretationDomain(this.variable.type).every(value => this.formula.valuation(m, w, assign(g, this.variable, value)).value));
+        return new Truth(m.interpretationDomain(this.variable.type).every(value => this.formula.valuation(m, w, replaceAssign(g, this.variable, value)).value));
     };
     freeVariables(): Variable<Type>[] {
         return this.formula.freeVariables().filter(x => x.name !== this.variable.name);
@@ -346,7 +346,7 @@ class All<A extends Type> implements Formula<"t"> {
         //問題なければそのまま再帰
         return new All(this.variable, this.formula.replace(search, replacer));
     }
-    reduction(): Formula<"t"> {
+    reduce(): Formula<"t"> {
         return new All(this.variable, this.formula);
     }
     toString() {
@@ -369,7 +369,7 @@ class Must implements Formula<"t"> {
     replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<"t"> {
         return new Must(this.formula.replace(search, replacer));
     }
-    reduction(): Formula<"t"> {
+    reduce(): Formula<"t"> {
         return new Must(this.formula);
     }
     toString() {
@@ -392,7 +392,7 @@ class May implements Formula<"t"> {
     replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<"t"> {
         return new May(this.formula.replace(search, replacer));
     }
-    reduction(): Formula<"t"> {
+    reduce(): Formula<"t"> {
         return new May(this.formula);
     }
     toString() {
@@ -416,7 +416,7 @@ class Up<A extends Type> implements Formula<["s", A]> {
     replace<B extends Type>(search: Variable<B>, replacer: Formula<B>): Formula<["s", A]> {
         return new Up(this.formula.replace(search, replacer), this.type);
     }
-    reduction(): Formula<["s", A]> {
+    reduce(): Formula<["s", A]> {
         return new Up(this.formula, this.type);
     }
     toString() {
@@ -440,9 +440,9 @@ class Down<A extends Type> implements Formula<A> {
     replace<B extends Type>(search: Variable<B>, replacer: Formula<B>): Formula<A> {
         return new Down(this.formula.replace(search, replacer), this.type);
     }
-    reduction(): Formula<A> {
+    reduce(): Formula<A> {
         // 簡約して、アップになったら消す
-        let formula = this.formula.reduction();
+        let formula = this.formula.reduce();
         if (formula instanceof Up) 
             return formula.formula;
         return new Down(formula, this.type);
@@ -462,7 +462,7 @@ class Lambda<A extends Type, B extends Type> implements Formula<[A, B]> {
         this.formula = formula;
     };
     valuation(m: Model, w: Situation, g: Assignment): TypeValue<[A, B]> {
-        return new ComplexValue(this.type, d => this.formula.valuation(m, w, assign(g, this.variable, d)));
+        return new ComplexValue(this.type, d => this.formula.valuation(m, w, replaceAssign(g, this.variable, d)));
     }
     freeVariables(): Variable<Type>[] {
         return this.formula.freeVariables().filter(x => x.name !== this.variable.name);
@@ -483,7 +483,7 @@ class Lambda<A extends Type, B extends Type> implements Formula<[A, B]> {
         //問題なければそのまま再帰
         return new Lambda(this.variable, this.formula.replace(search, replacer), this.type);
     }
-    reduction(): Formula<[A, B]> {
+    reduce(): Formula<[A, B]> {
         return new Lambda(this.variable, this.formula, this.type);
     }
     toString() {
@@ -509,12 +509,12 @@ class Apply<A extends Type, B extends Type> implements Formula<B> {
     replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<B> {
         return new Apply(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer), this.type);
     }
-    reduction(): Formula<B> {
+    reduce(): Formula<B> {
         // 関数側を簡約して、ラムダになったら置き換えして、また簡約
-        let formula0 = this.formula0.reduction();
+        let formula0 = this.formula0.reduce();
         if (formula0 instanceof Lambda) 
-            return formula0.formula.replace(formula0.variable, this.formula1).reduction();
-        return new Apply(formula0, this.formula1.reduction(), this.type);
+            return formula0.formula.replace(formula0.variable, this.formula1).reduce();
+        return new Apply(formula0, this.formula1.reduce(), this.type);
     }
     toString() {
         return this.formula0.toString() + "(" + this.formula1.toString() + ")";
@@ -689,6 +689,6 @@ console.log(JohnGaHashiru.toString()); //ジョンが走る
 
 console.log(JohnGaHashiru.translate().toString()); // λX.↓X(j)(↑RUN)
 
-console.log(JohnGaHashiru.translate().reduction().toString()); // RUN(j)
+console.log(JohnGaHashiru.translate().reduce().toString()); // RUN(j)
 
 console.log(JohnGaHashiru.translate().valuation(model, w0, g)); // Truth {type: "t", value: true}

@@ -27,7 +27,7 @@ class ComplexValue {
     }
 }
 // g_[x/d]
-function assign(g, variable, value) {
+function replaceAssign(g, variable, value) {
     return v => v.name === variable.name ? value : g(v);
 }
 class Model {
@@ -69,7 +69,7 @@ class Variable {
         else
             return this;
     }
-    reduction() {
+    reduce() {
         return this;
     }
     toString() {
@@ -94,7 +94,7 @@ class Constant {
     replace(search, replacer) {
         return this;
     }
-    reduction() {
+    reduce() {
         return this;
     }
     toString() {
@@ -119,7 +119,7 @@ class Not {
     replace(search, replacer) {
         return new Not(this.formula.replace(search, replacer));
     }
-    reduction() {
+    reduce() {
         return new Not(this.formula);
     }
     toString() {
@@ -144,7 +144,7 @@ class And {
     replace(search, replacer) {
         return new And(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
     }
-    reduction() {
+    reduce() {
         return new And(this.formula0, this.formula1);
     }
     toString() {
@@ -170,7 +170,7 @@ class Or {
     replace(search, replacer) {
         return new Or(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
     }
-    reduction() {
+    reduce() {
         return new Or(this.formula0, this.formula1);
     }
     toString() {
@@ -196,7 +196,7 @@ class If {
     replace(search, replacer) {
         return new If(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
     }
-    reduction() {
+    reduce() {
         return new If(this.formula0, this.formula1);
     }
     toString() {
@@ -222,7 +222,7 @@ class Iff {
     replace(search, replacer) {
         return new Iff(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
     }
-    reduction() {
+    reduce() {
         return new Iff(this.formula0, this.formula1);
     }
     toString() {
@@ -247,7 +247,7 @@ class Equal {
     replace(search, replacer) {
         return new Equal(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
     }
-    reduction() {
+    reduce() {
         return new Equal(this.formula0, this.formula1);
     }
     toString() {
@@ -264,7 +264,7 @@ class Exist {
     }
     ;
     valuation(m, w, g) {
-        return new Truth(m.interpretationDomain(this.variable.type).some(value => this.formula.valuation(m, w, assign(g, this.variable, value)).value));
+        return new Truth(m.interpretationDomain(this.variable.type).some(value => this.formula.valuation(m, w, replaceAssign(g, this.variable, value)).value));
     }
     ;
     freeVariables() {
@@ -283,7 +283,7 @@ class Exist {
         //問題なければそのまま再帰
         return new Exist(this.variable, this.formula.replace(search, replacer));
     }
-    reduction() {
+    reduce() {
         return new Exist(this.variable, this.formula);
     }
     toString() {
@@ -300,7 +300,7 @@ class All {
     }
     ;
     valuation(m, w, g) {
-        return new Truth(m.interpretationDomain(this.variable.type).every(value => this.formula.valuation(m, w, assign(g, this.variable, value)).value));
+        return new Truth(m.interpretationDomain(this.variable.type).every(value => this.formula.valuation(m, w, replaceAssign(g, this.variable, value)).value));
     }
     ;
     freeVariables() {
@@ -319,7 +319,7 @@ class All {
         //問題なければそのまま再帰
         return new All(this.variable, this.formula.replace(search, replacer));
     }
-    reduction() {
+    reduce() {
         return new All(this.variable, this.formula);
     }
     toString() {
@@ -342,7 +342,7 @@ class Must {
     replace(search, replacer) {
         return new Must(this.formula.replace(search, replacer));
     }
-    reduction() {
+    reduce() {
         return new Must(this.formula);
     }
     toString() {
@@ -365,7 +365,7 @@ class May {
     replace(search, replacer) {
         return new May(this.formula.replace(search, replacer));
     }
-    reduction() {
+    reduce() {
         return new May(this.formula);
     }
     toString() {
@@ -388,7 +388,7 @@ class Up {
     replace(search, replacer) {
         return new Up(this.formula.replace(search, replacer), this.type);
     }
-    reduction() {
+    reduce() {
         return new Up(this.formula, this.type);
     }
     toString() {
@@ -411,9 +411,9 @@ class Down {
     replace(search, replacer) {
         return new Down(this.formula.replace(search, replacer), this.type);
     }
-    reduction() {
+    reduce() {
         // 簡約して、アップになったら消す
-        let formula = this.formula.reduction();
+        let formula = this.formula.reduce();
         if (formula instanceof Up)
             return formula.formula;
         return new Down(formula, this.type);
@@ -432,7 +432,7 @@ class Lambda {
     }
     ;
     valuation(m, w, g) {
-        return new ComplexValue(this.type, d => this.formula.valuation(m, w, assign(g, this.variable, d)));
+        return new ComplexValue(this.type, d => this.formula.valuation(m, w, replaceAssign(g, this.variable, d)));
     }
     freeVariables() {
         return this.formula.freeVariables().filter(x => x.name !== this.variable.name);
@@ -450,7 +450,7 @@ class Lambda {
         //問題なければそのまま再帰
         return new Lambda(this.variable, this.formula.replace(search, replacer), this.type);
     }
-    reduction() {
+    reduce() {
         return new Lambda(this.variable, this.formula, this.type);
     }
     toString() {
@@ -474,12 +474,12 @@ class Apply {
     replace(search, replacer) {
         return new Apply(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer), this.type);
     }
-    reduction() {
+    reduce() {
         // 関数側を簡約して、ラムダになったら置き換えして、また簡約
-        let formula0 = this.formula0.reduction();
+        let formula0 = this.formula0.reduce();
         if (formula0 instanceof Lambda)
-            return formula0.formula.replace(formula0.variable, this.formula1).reduction();
-        return new Apply(formula0, this.formula1.reduction(), this.type);
+            return formula0.formula.replace(formula0.variable, this.formula1).reduce();
+        return new Apply(formula0, this.formula1.reduce(), this.type);
     }
     toString() {
         return this.formula0.toString() + "(" + this.formula1.toString() + ")";
@@ -592,5 +592,5 @@ const hashiru = new Intransitive("走る", new Constant("RUN", ["e", "t"], (w =>
 const JohnGaHashiru = new SubjectIntransitive(john, hashiru);
 console.log(JohnGaHashiru.toString()); //ジョンが走る
 console.log(JohnGaHashiru.translate().toString()); // λX.↓X(j)(↑RUN)
-console.log(JohnGaHashiru.translate().reduction().toString()); // RUN(j)
+console.log(JohnGaHashiru.translate().reduce().toString()); // RUN(j)
 console.log(JohnGaHashiru.translate().valuation(model, w0, g)); // Truth {type: "t", value: true}
