@@ -39,12 +39,12 @@ type TypeValue<T extends Type> =
 
 type Assignment = <B extends Type>(_: Variable<B>) => TypeValue<B>;
 
-interface ME<A extends Type> {
+interface Formula<A extends Type> {
     type: Type;
     valuation: (m: Model, w: Situation, g: Assignment) => TypeValue<A>;
 }
 
-class Variable<A extends Type> implements ME<A> {
+class Variable<A extends Type> implements Formula<A> {
     readonly sort = "variable";
     readonly name: string;
     readonly type: A;
@@ -59,7 +59,7 @@ class Variable<A extends Type> implements ME<A> {
         return this.name;
     };
 }
-class Constant<A extends Type> implements ME<A> {
+class Constant<A extends Type> implements Formula<A> {
     readonly sort = "constant";
     readonly name: string;
     readonly type: A;
@@ -76,222 +76,222 @@ class Constant<A extends Type> implements ME<A> {
         return this.name;
     };
 }
-class Not implements ME<"t"> {
+class Not implements Formula<"t"> {
     readonly sort = "￢";
     readonly type = "t";
-    readonly expr: ME<"t">;
-    constructor(expr: ME<"t">) {
-        this.expr = expr;
+    readonly formula: Formula<"t">;
+    constructor(formula: Formula<"t">) {
+        this.formula = formula;
     };
     valuation(m: Model, w: Situation, g: Assignment): Truth {
-        return new Truth(!this.expr.valuation(m, w, g).value);
+        return new Truth(!this.formula.valuation(m, w, g).value);
     };
     toString() {
-        return "￢" + this.expr.toString();
+        return "￢" + this.formula.toString();
     }
 }
-class And implements ME<"t"> {
+class And implements Formula<"t"> {
     readonly sort = "∧";
     readonly type = "t";
-    readonly left: ME<"t">;
-    readonly right: ME<"t">;
-    constructor(left: ME<"t">, right: ME<"t">) {
-        this.left = left;
-        this.right = right;
+    readonly formula0: Formula<"t">;
+    readonly formula1: Formula<"t">;
+    constructor(formula0: Formula<"t">, formula1: Formula<"t">) {
+        this.formula0 = formula0;
+        this.formula1 = formula1;
     };
     valuation(m: Model, w: Situation, g: Assignment): Truth {
-        return new Truth(this.left.valuation(m, w, g).value && this.right.valuation(m, w, g).value);
+        return new Truth(this.formula0.valuation(m, w, g).value && this.formula1.valuation(m, w, g).value);
     };
     toString() {
-        return this.left.toString() + "∧" + this.right.toString();
+        return this.formula0.toString() + "∧" + this.formula1.toString();
     };
 }
-class Or implements ME<"t"> {
+class Or implements Formula<"t"> {
     readonly sort = "∨";
     readonly type = "t";
-    readonly left: ME<"t">;
-    readonly right: ME<"t">;
-    constructor(left: ME<"t">, right: ME<"t">) {
-        this.left = left;
-        this.right = right;
+    readonly formula0: Formula<"t">;
+    readonly formula1: Formula<"t">;
+    constructor(formula0: Formula<"t">, formula1: Formula<"t">) {
+        this.formula0 = formula0;
+        this.formula1 = formula1;
     };
     valuation(m: Model, w: Situation, g: Assignment): Truth {
-        return new Truth(this.left.valuation(m, w, g).value || this.right.valuation(m, w, g).value);
+        return new Truth(this.formula0.valuation(m, w, g).value || this.formula1.valuation(m, w, g).value);
     };
     toString() {
-        return this.left.toString() + "∨" + this.right.toString();
+        return this.formula0.toString() + "∨" + this.formula1.toString();
     };
 }
-class If implements ME<"t"> {
+class If implements Formula<"t"> {
     readonly sort = "⇒";
     readonly type = "t";
-    readonly left: ME<"t">;
-    readonly right: ME<"t">;
-    constructor(left: ME<"t">, right: ME<"t">) {
-        this.left = left;
-        this.right = right;
+    readonly formula0: Formula<"t">;
+    readonly formula1: Formula<"t">;
+    constructor(formula0: Formula<"t">, formula1: Formula<"t">) {
+        this.formula0 = formula0;
+        this.formula1 = formula1;
     };
     valuation(m: Model, w: Situation, g: Assignment): Truth {
-        return new Truth(!this.left.valuation(m, w, g).value || this.right.valuation(m, w, g).value);
+        return new Truth(!this.formula0.valuation(m, w, g).value || this.formula1.valuation(m, w, g).value);
     };
     toString() {
-        return this.left.toString() + "⇒" + this.right.toString();
+        return this.formula0.toString() + "⇒" + this.formula1.toString();
     };
 }
-class Iff implements ME<"t"> {
+class Iff implements Formula<"t"> {
     readonly sort = "⇔";
     readonly type = "t";
-    readonly left: ME<"t">;
-    readonly right: ME<"t">;
-    constructor(left: ME<"t">, right: ME<"t">) {
-        this.left = left;
-        this.right = right;
+    readonly formula0: Formula<"t">;
+    readonly formula1: Formula<"t">;
+    constructor(formula0: Formula<"t">, formula1: Formula<"t">) {
+        this.formula0 = formula0;
+        this.formula1 = formula1;
     };
     valuation(m: Model, w: Situation, g: Assignment): Truth {
-        return new Truth(this.left.valuation(m, w, g).value == this.right.valuation(m, w, g).value);
+        return new Truth(this.formula0.valuation(m, w, g).value == this.formula1.valuation(m, w, g).value);
     };
     toString() {
-        return this.left.toString() + "⇔" + this.right.toString();
+        return this.formula0.toString() + "⇔" + this.formula1.toString();
     };
 }
-class Exist<A extends Type> implements ME<"t"> {
+class Exist<A extends Type> implements Formula<"t"> {
     readonly sort = "∃";
     readonly type = "t";
     readonly variable: Variable<A>;
-    readonly expr: ME<"t">;
-    constructor(variable: Variable<A>, expr: ME<"t">) {
+    readonly formula: Formula<"t">;
+    constructor(variable: Variable<A>, formula: Formula<"t">) {
         this.variable = variable;
-        this.expr = expr;
+        this.formula = formula;
     };
     valuation(m: Model, w: Situation, g: Assignment): Truth {
-        return new Truth(m.interpretationDomain(this.variable.type).some(value => this.expr.valuation(m, w, assign(g, this.variable, value)).value));
+        return new Truth(m.interpretationDomain(this.variable.type).some(value => this.formula.valuation(m, w, assign(g, this.variable, value)).value));
     };
     toString() {
-        return "∃" + this.variable.toString() + "." + this.expr.toString();
+        return "∃" + this.variable.toString() + "." + this.formula.toString();
     };
 }
-class All<A extends Type> implements ME<"t"> {
+class All<A extends Type> implements Formula<"t"> {
     readonly sort = "∀";
     readonly type = "t";
     readonly variable: Variable<A>;
-    readonly expr: ME<"t">;
-    constructor(variable: Variable<A>, expr: ME<"t">) {
+    readonly formula: Formula<"t">;
+    constructor(variable: Variable<A>, formula: Formula<"t">) {
         this.variable = variable;
-        this.expr = expr;
+        this.formula = formula;
     };
     valuation(m: Model, w: Situation, g: Assignment): Truth {
-        return new Truth(m.interpretationDomain(this.variable.type).every(value => this.expr.valuation(m, w, assign(g, this.variable, value)).value));
+        return new Truth(m.interpretationDomain(this.variable.type).every(value => this.formula.valuation(m, w, assign(g, this.variable, value)).value));
     };
     toString() {
-        return "∀" + this.variable.toString() + "." + this.expr.toString();
+        return "∀" + this.variable.toString() + "." + this.formula.toString();
     };
 }
-class Equal<A extends Type> implements ME<"t"> {
+class Equal<A extends Type> implements Formula<"t"> {
     readonly sort = "＝";
     readonly type = "t";
-    readonly left: ME<A>;
-    readonly right: ME<A>;
-    constructor(left: ME<A>, right: ME<A>) {
-        this.left = left;
-        this.right = right;
+    readonly formula0: Formula<A>;
+    readonly formula1: Formula<A>;
+    constructor(formula0: Formula<A>, formula1: Formula<A>) {
+        this.formula0 = formula0;
+        this.formula1 = formula1;
     };
     valuation(m: Model, w: Situation, g: Assignment): Truth {
-        return new Truth(equals(m, this.left.valuation(m, w, g), this.left.valuation(m, w, g)));
+        return new Truth(equals(m, this.formula0.valuation(m, w, g), this.formula0.valuation(m, w, g)));
     }
     toString() {
-        return this.left.toString() + "＝" + this.right.toString();
+        return this.formula0.toString() + "＝" + this.formula1.toString();
     };
 }
-class Must implements ME<"t"> {
+class Must implements Formula<"t"> {
     readonly sort = "□";
     readonly type = "t";
-    readonly expr: ME<"t">;
-    constructor(expr: ME<"t">) {
-        this.expr = expr;
+    readonly formula: Formula<"t">;
+    constructor(formula: Formula<"t">) {
+        this.formula = formula;
     }
     valuation(m: Model, w: Situation, g: Assignment): Truth {
-        return new Truth(m.worlds.every(_w => this.expr.valuation(m, _w, g).value));
+        return new Truth(m.worlds.every(_w => this.formula.valuation(m, _w, g).value));
     }
     toString() {
-        return "□" + this.expr.toString();
+        return "□" + this.formula.toString();
     };
 }
-class May implements ME<"t"> {
+class May implements Formula<"t"> {
     readonly sort = "◇";
     readonly type = "t";
-    readonly expr: ME<"t">;
-    constructor(expr: ME<"t">) {
-        this.expr = expr;
+    readonly formula: Formula<"t">;
+    constructor(formula: Formula<"t">) {
+        this.formula = formula;
     }
     valuation(m: Model, w: Situation, g: Assignment): Truth {
-        return new Truth(m.worlds.some(_w => this.expr.valuation(m, _w, g).value));
+        return new Truth(m.worlds.some(_w => this.formula.valuation(m, _w, g).value));
     }
     toString() {
-        return "◇" + this.expr.toString();
+        return "◇" + this.formula.toString();
     };
 }
-class Up<A extends Type> implements ME<["s", A]> {
+class Up<A extends Type> implements Formula<["s", A]> {
     readonly sort = "↑";
     readonly type: ["s", A];
-    readonly expr: ME<A>;
-    constructor(expr: ME<A>, type: ["s", A]) {
+    readonly formula: Formula<A>;
+    constructor(formula: Formula<A>, type: ["s", A]) {
         this.type = type;
-        this.expr = expr;
+        this.formula = formula;
     }
     valuation(m: Model, w: Situation, g: Assignment): TypeValue<["s", A]> {
-        return new ComplexValue(this.type, _w => this.expr.valuation(m, _w, g));
+        return new ComplexValue(this.type, _w => this.formula.valuation(m, _w, g));
     }
     toString() {
-        return "↑" + this.expr.toString();
+        return "↑" + this.formula.toString();
     };
 }
-class Down<A extends Type> implements ME<A> {
+class Down<A extends Type> implements Formula<A> {
     readonly sort = "↓";
     readonly type: A;
-    readonly expr: ME<["s", A]>;
-    constructor(expr: ME<["s", A]>, type: A) {
+    readonly formula: Formula<["s", A]>;
+    constructor(formula: Formula<["s", A]>, type: A) {
         this.type = type;
-        this.expr = expr;
+        this.formula = formula;
     }
     valuation(m: Model, w: Situation, g: Assignment): TypeValue<A> {
-        return apply(this.expr.valuation(m, w, g), w);
+        return apply(this.formula.valuation(m, w, g), w);
     }
     toString() {
-        return "↓" + this.expr.toString();
+        return "↓" + this.formula.toString();
     };
 }
-class Lambda<A extends Type, B extends Type> implements ME<[A, B]> {
+class Lambda<A extends Type, B extends Type> implements Formula<[A, B]> {
     readonly sort = "λ";
     readonly type: [A, B];
     readonly variable: Variable<A>;
-    readonly expr: ME<B>;
-    constructor(variable: Variable<A>, expr: ME<B>, type: [A, B]) {
+    readonly formula: Formula<B>;
+    constructor(variable: Variable<A>, formula: Formula<B>, type: [A, B]) {
         this.variable = variable;
         this.type = type;
-        this.expr = expr;
+        this.formula = formula;
     };
     valuation(m: Model, w: Situation, g: Assignment): TypeValue<[A, B]> {
-        return new ComplexValue(this.type, d => this.expr.valuation(m, w, assign(g, this.variable, d)));
+        return new ComplexValue(this.type, d => this.formula.valuation(m, w, assign(g, this.variable, d)));
     }
     toString() {
-        return "λ" + this.variable.toString() + "." + this.expr.toString();
+        return "λ" + this.variable.toString() + "." + this.formula.toString();
     };
 }
-class Apply<A extends Type, B extends Type> implements ME<B> {
+class Apply<A extends Type, B extends Type> implements Formula<B> {
     readonly sort = "apply";
     readonly type: B;
-    readonly left: ME<[A, B]>;
-    readonly right: ME<A>;
-    constructor(left: ME<[A, B]>, right: ME<A>, type: B) {
-        this.left = left;
-        this.right = right;
+    readonly formula0: Formula<[A, B]>;
+    readonly formula1: Formula<A>;
+    constructor(formula0: Formula<[A, B]>, formula1: Formula<A>, type: B) {
+        this.formula0 = formula0;
+        this.formula1 = formula1;
         this.type = type;
     }
     valuation(m: Model, w: Situation, g: Assignment): TypeValue<B> {
-        return apply(this.left.valuation(m, w, g), (this.right.valuation(m, w, g)));
+        return apply(this.formula0.valuation(m, w, g), (this.formula1.valuation(m, w, g)));
     }
     toString() {
-        return this.left.toString() + "(" + this.right.toString() + ")";
+        return this.formula0.toString() + "(" + this.formula1.toString() + ")";
     };
 }
 
@@ -346,11 +346,11 @@ function assign<A extends Type>(
 type Categoly = "t" | "e" | [Categoly, Categoly];
 
 
-interface LanguageExpression<C extends Categoly, T extends Type> {
-    transrate: () => ME<T>;
+interface Expression<C extends Categoly, T extends Type> {
+    transrate: () => Formula<T>;
 }
 
-class ProperNoun implements LanguageExpression<"e", [["s", ["e", "t"]], "t"]> {
+class ProperNoun implements Expression<"e", [["s", ["e", "t"]], "t"]> {
     readonly constant: Constant<"e">;
     readonly literal: string;
     constructor(literal: string, constant: Constant<"e">) {
@@ -371,7 +371,7 @@ class ProperNoun implements LanguageExpression<"e", [["s", ["e", "t"]], "t"]> {
         );
     }
     toString() {
-        return this.name;
+        return this.literal;
     }
 }
 

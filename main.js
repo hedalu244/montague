@@ -59,222 +59,222 @@ class Constant {
     ;
 }
 class Not {
-    constructor(expr) {
+    constructor(formula) {
         this.sort = "￢";
         this.type = "t";
-        this.expr = expr;
+        this.formula = formula;
     }
     ;
     valuation(m, w, g) {
-        return new Truth(!this.expr.valuation(m, w, g).value);
+        return new Truth(!this.formula.valuation(m, w, g).value);
     }
     ;
     toString() {
-        return "￢" + this.expr.toString();
+        return "￢" + this.formula.toString();
     }
 }
 class And {
-    constructor(left, right) {
+    constructor(formula0, formula1) {
         this.sort = "∧";
         this.type = "t";
-        this.left = left;
-        this.right = right;
+        this.formula0 = formula0;
+        this.formula1 = formula1;
     }
     ;
     valuation(m, w, g) {
-        return new Truth(this.left.valuation(m, w, g).value && this.right.valuation(m, w, g).value);
+        return new Truth(this.formula0.valuation(m, w, g).value && this.formula1.valuation(m, w, g).value);
     }
     ;
     toString() {
-        return this.left.toString() + "∧" + this.right.toString();
+        return this.formula0.toString() + "∧" + this.formula1.toString();
     }
     ;
 }
 class Or {
-    constructor(left, right) {
+    constructor(formula0, formula1) {
         this.sort = "∨";
         this.type = "t";
-        this.left = left;
-        this.right = right;
+        this.formula0 = formula0;
+        this.formula1 = formula1;
     }
     ;
     valuation(m, w, g) {
-        return new Truth(this.left.valuation(m, w, g).value || this.right.valuation(m, w, g).value);
+        return new Truth(this.formula0.valuation(m, w, g).value || this.formula1.valuation(m, w, g).value);
     }
     ;
     toString() {
-        return this.left.toString() + "∨" + this.right.toString();
+        return this.formula0.toString() + "∨" + this.formula1.toString();
     }
     ;
 }
 class If {
-    constructor(left, right) {
+    constructor(formula0, formula1) {
         this.sort = "⇒";
         this.type = "t";
-        this.left = left;
-        this.right = right;
+        this.formula0 = formula0;
+        this.formula1 = formula1;
     }
     ;
     valuation(m, w, g) {
-        return new Truth(!this.left.valuation(m, w, g).value || this.right.valuation(m, w, g).value);
+        return new Truth(!this.formula0.valuation(m, w, g).value || this.formula1.valuation(m, w, g).value);
     }
     ;
     toString() {
-        return this.left.toString() + "⇒" + this.right.toString();
+        return this.formula0.toString() + "⇒" + this.formula1.toString();
     }
     ;
 }
 class Iff {
-    constructor(left, right) {
+    constructor(formula0, formula1) {
         this.sort = "⇔";
         this.type = "t";
-        this.left = left;
-        this.right = right;
+        this.formula0 = formula0;
+        this.formula1 = formula1;
     }
     ;
     valuation(m, w, g) {
-        return new Truth(this.left.valuation(m, w, g).value == this.right.valuation(m, w, g).value);
+        return new Truth(this.formula0.valuation(m, w, g).value == this.formula1.valuation(m, w, g).value);
     }
     ;
     toString() {
-        return this.left.toString() + "⇔" + this.right.toString();
+        return this.formula0.toString() + "⇔" + this.formula1.toString();
     }
     ;
 }
 class Exist {
-    constructor(variable, expr) {
+    constructor(variable, formula) {
         this.sort = "∃";
         this.type = "t";
         this.variable = variable;
-        this.expr = expr;
+        this.formula = formula;
     }
     ;
     valuation(m, w, g) {
-        return new Truth(m.interpretationDomain(this.variable.type).some(value => this.expr.valuation(m, w, assign(g, this.variable, value)).value));
+        return new Truth(m.interpretationDomain(this.variable.type).some(value => this.formula.valuation(m, w, assign(g, this.variable, value)).value));
     }
     ;
     toString() {
-        return "∃" + this.variable.toString() + "." + this.expr.toString();
+        return "∃" + this.variable.toString() + "." + this.formula.toString();
     }
     ;
 }
 class All {
-    constructor(variable, expr) {
+    constructor(variable, formula) {
         this.sort = "∀";
         this.type = "t";
         this.variable = variable;
-        this.expr = expr;
+        this.formula = formula;
     }
     ;
     valuation(m, w, g) {
-        return new Truth(m.interpretationDomain(this.variable.type).every(value => this.expr.valuation(m, w, assign(g, this.variable, value)).value));
+        return new Truth(m.interpretationDomain(this.variable.type).every(value => this.formula.valuation(m, w, assign(g, this.variable, value)).value));
     }
     ;
     toString() {
-        return "∀" + this.variable.toString() + "." + this.expr.toString();
+        return "∀" + this.variable.toString() + "." + this.formula.toString();
     }
     ;
 }
 class Equal {
-    constructor(left, right) {
+    constructor(formula0, formula1) {
         this.sort = "＝";
         this.type = "t";
-        this.left = left;
-        this.right = right;
+        this.formula0 = formula0;
+        this.formula1 = formula1;
     }
     ;
     valuation(m, w, g) {
-        return new Truth(equals(m, this.left.valuation(m, w, g), this.left.valuation(m, w, g)));
+        return new Truth(equals(m, this.formula0.valuation(m, w, g), this.formula0.valuation(m, w, g)));
     }
     toString() {
-        return this.left.toString() + "＝" + this.right.toString();
+        return this.formula0.toString() + "＝" + this.formula1.toString();
     }
     ;
 }
 class Must {
-    constructor(expr) {
+    constructor(formula) {
         this.sort = "□";
         this.type = "t";
-        this.expr = expr;
+        this.formula = formula;
     }
     valuation(m, w, g) {
-        return new Truth(m.worlds.every(_w => this.expr.valuation(m, _w, g).value));
+        return new Truth(m.worlds.every(_w => this.formula.valuation(m, _w, g).value));
     }
     toString() {
-        return "□" + this.expr.toString();
+        return "□" + this.formula.toString();
     }
     ;
 }
 class May {
-    constructor(expr) {
+    constructor(formula) {
         this.sort = "◇";
         this.type = "t";
-        this.expr = expr;
+        this.formula = formula;
     }
     valuation(m, w, g) {
-        return new Truth(m.worlds.some(_w => this.expr.valuation(m, _w, g).value));
+        return new Truth(m.worlds.some(_w => this.formula.valuation(m, _w, g).value));
     }
     toString() {
-        return "◇" + this.expr.toString();
+        return "◇" + this.formula.toString();
     }
     ;
 }
 class Up {
-    constructor(expr, type) {
+    constructor(formula, type) {
         this.sort = "↑";
         this.type = type;
-        this.expr = expr;
+        this.formula = formula;
     }
     valuation(m, w, g) {
-        return new ComplexValue(this.type, _w => this.expr.valuation(m, _w, g));
+        return new ComplexValue(this.type, _w => this.formula.valuation(m, _w, g));
     }
     toString() {
-        return "↑" + this.expr.toString();
+        return "↑" + this.formula.toString();
     }
     ;
 }
 class Down {
-    constructor(expr, type) {
+    constructor(formula, type) {
         this.sort = "↓";
         this.type = type;
-        this.expr = expr;
+        this.formula = formula;
     }
     valuation(m, w, g) {
-        return apply(this.expr.valuation(m, w, g), w);
+        return apply(this.formula.valuation(m, w, g), w);
     }
     toString() {
-        return "↓" + this.expr.toString();
+        return "↓" + this.formula.toString();
     }
     ;
 }
 class Lambda {
-    constructor(variable, expr, type) {
+    constructor(variable, formula, type) {
         this.sort = "λ";
         this.variable = variable;
         this.type = type;
-        this.expr = expr;
+        this.formula = formula;
     }
     ;
     valuation(m, w, g) {
-        return new ComplexValue(this.type, d => this.expr.valuation(m, w, assign(g, this.variable, d)));
+        return new ComplexValue(this.type, d => this.formula.valuation(m, w, assign(g, this.variable, d)));
     }
     toString() {
-        return "λ" + this.variable.toString() + "." + this.expr.toString();
+        return "λ" + this.variable.toString() + "." + this.formula.toString();
     }
     ;
 }
 class Apply {
-    constructor(left, right, type) {
+    constructor(formula0, formula1, type) {
         this.sort = "apply";
-        this.left = left;
-        this.right = right;
+        this.formula0 = formula0;
+        this.formula1 = formula1;
         this.type = type;
     }
     valuation(m, w, g) {
-        return apply(this.left.valuation(m, w, g), (this.right.valuation(m, w, g)));
+        return apply(this.formula0.valuation(m, w, g), (this.formula1.valuation(m, w, g)));
     }
     toString() {
-        return this.left.toString() + "(" + this.right.toString() + ")";
+        return this.formula0.toString() + "(" + this.formula1.toString() + ")";
     }
     ;
 }
@@ -325,7 +325,7 @@ class ProperNoun {
         return new Lambda(new Variable("X", ["s", ["e", "t"]]), new Apply(new Down(new Variable("X", ["s", ["e", "t"]]), ["e", "t"]), this.constant, "t"), [["s", ["e", "t"]], "t"]);
     }
     toString() {
-        return this.name;
+        return this.literal;
     }
 }
 const j = new Entity("j");
