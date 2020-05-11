@@ -39,6 +39,36 @@ type TypeValue<T extends Type> =
 
 type Assignment = <B extends Type>(_: Variable<B>) => TypeValue<B>;
 
+// g_[x/d]
+function assign<A extends Type>(
+    g: Assignment,
+    variable: Variable<A>,
+    value: TypeValue<A>): Assignment {
+    return v => v.name === variable.name ? value : g(v);
+}
+
+class Model {
+    readonly domain: Entity[];
+    readonly worlds: Situation[];
+    constructor(domain: Entity[], worlds: Situation[]) {
+        this.domain = domain;
+        this.worlds = worlds;
+    }
+    interpretationDomain<A extends Type>(type: A): TypeValue<A>[] {
+        if (type === "t") return [new Truth(true), new Truth(false)];
+        if (type === "e") return [...this.domain];
+        if (type === "s") return [...this.worlds];
+
+        const aa: TypeValue<A[0]>[] = this.interpretationDomain(type[0]);
+        const bb: TypeValue<A[1]>[] = this.interpretationDomain(type[1]);
+
+        // bbのaa.lengthタプル（全組み合わせ）の配列を作る
+        const table: TypeValue<A[1]>[][] = aa.reduce((prev: TypeValue<A[1]>[][]) => bb.map(b => prev.map(t => [b, ...t, b])).reduce((a, b) => a.concat(b), []), [[]]);
+
+        return table.map(t => new ComplexValue(type, (x: TypeValue<A[0]>): TypeValue<A[1]> => t[aa.findIndex(y => equals(x, y))]));
+    }
+}
+
 interface Formula<A extends Type> {
     type: Type;
     valuation(m: Model, w: Situation, g: Assignment): TypeValue<A>;
@@ -224,6 +254,31 @@ class Iff implements Formula<"t"> {
         return this.formula0.toString() + "⇔" + this.formula1.toString();
     };
 }
+class Equal<A extends Type> implements Formula<"t"> {
+    readonly sort = "＝";
+    readonly type = "t";
+    readonly formula0: Formula<A>;
+    readonly formula1: Formula<A>;
+    constructor(formula0: Formula<A>, formula1: Formula<A>) {
+        this.formula0 = formula0;
+        this.formula1 = formula1;
+    };
+    valuation(m: Model, w: Situation, g: Assignment): Truth {
+        return new Truth(equals(this.formula0.valuation(m, w, g), this.formula0.valuation(m, w, g)));
+    }
+    freeVariables(): Variable<Type>[] {
+        return [...this.formula0.freeVariables(), ...this.formula1.freeVariables()];
+    }
+    replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<"t"> {
+        return new Equal(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
+    }
+    reduction(): Formula<"t"> {
+        return new Equal(this.formula0, this.formula1);
+    }
+    toString() {
+        return this.formula0.toString() + "＝" + this.formula1.toString();
+    };
+}
 class Exist<A extends Type> implements Formula<"t"> {
     readonly sort = "∃";
     readonly type = "t";
@@ -296,31 +351,6 @@ class All<A extends Type> implements Formula<"t"> {
     }
     toString() {
         return "∀" + this.variable.toString() + "." + this.formula.toString();
-    };
-}
-class Equal<A extends Type> implements Formula<"t"> {
-    readonly sort = "＝";
-    readonly type = "t";
-    readonly formula0: Formula<A>;
-    readonly formula1: Formula<A>;
-    constructor(formula0: Formula<A>, formula1: Formula<A>) {
-        this.formula0 = formula0;
-        this.formula1 = formula1;
-    };
-    valuation(m: Model, w: Situation, g: Assignment): Truth {
-        return new Truth(equals(this.formula0.valuation(m, w, g), this.formula0.valuation(m, w, g)));
-    }
-    freeVariables(): Variable<Type>[] {
-        return [...this.formula0.freeVariables(), ...this.formula1.freeVariables()];
-    }
-    replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<"t"> {
-        return new Equal(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
-    }
-    reduction(): Formula<"t"> {
-        return new Equal(this.formula0, this.formula1);
-    }
-    toString() {
-        return this.formula0.toString() + "＝" + this.formula1.toString();
     };
 }
 class Must implements Formula<"t"> {
@@ -402,7 +432,7 @@ class Down<A extends Type> implements Formula<A> {
         this.formula = formula;
     }
     valuation(m: Model, w: Situation, g: Assignment): TypeValue<A> {
-        return apply(this.formula.valuation(m, w, g), w);
+        return this.formula.valuation(m, w, g).value(w);
     }
     freeVariables(): Variable<Type>[] {
         return this.formula.freeVariables();
@@ -471,7 +501,7 @@ class Apply<A extends Type, B extends Type> implements Formula<B> {
         this.type = type;
     }
     valuation(m: Model, w: Situation, g: Assignment): TypeValue<B> {
-        return apply(this.formula0.valuation(m, w, g), (this.formula1.valuation(m, w, g)));
+        return this.formula0.valuation(m, w, g).value((this.formula1.valuation(m, w, g)));
     }
     freeVariables(): Variable<Type>[] {
         return [...this.formula0.freeVariables(), ...this.formula1.freeVariables()];
@@ -505,39 +535,6 @@ function equals(a: TypeValue<Type>, b: TypeValue<Type>): boolean {
     //return m.interpretationDomain(a.type[0]).every(x => equals(m, apply(a, x), apply(b, x)));
 }
 
-function apply<A extends Type, B extends Type>(func: ComplexValue<A, B>, x: TypeValue<A>) {
-    return func.value(x);
-}
-
-class Model {
-    readonly domain: Entity[];
-    readonly worlds: Situation[];
-    constructor(domain: Entity[], worlds: Situation[]) {
-        this.domain = domain;
-        this.worlds = worlds;
-    }
-    interpretationDomain<A extends Type>(type: A): TypeValue<A>[] {
-        if (type === "t") return [new Truth(true), new Truth(false)];
-        if (type === "e") return [...this.domain];
-        if (type === "s") return [...this.worlds];
-
-        const aa: TypeValue<A[0]>[] = this.interpretationDomain(type[0]);
-        const bb: TypeValue<A[1]>[] = this.interpretationDomain(type[1]);
-
-        // bbのaa.lengthタプル（全組み合わせ）の配列を作る
-        const table: TypeValue<A[1]>[][] = aa.reduce((prev: TypeValue<A[1]>[][]) => bb.map(b => prev.map(t => [b, ...t, b])).reduce((a, b) => a.concat(b), []), [[]]);
-
-        return table.map(t => new ComplexValue(type, (x: TypeValue<A[0]>): TypeValue<A[1]> => t[aa.findIndex(y => equals(x, y))]));
-    }
-}
-
-// g_[x/d]
-function assign<A extends Type>(
-    g: Assignment,
-    variable: Variable<A>,
-    value: TypeValue<A>): Assignment {
-    return v => v.name === variable.name ? value : g(v);
-}
 
 interface Expression<Categoly extends string, T extends Type> {
     translate: () => Formula<T>;
@@ -688,15 +685,10 @@ const hashiru = new Intransitive("走る", new Constant("RUN", ["e", "t"], (w =>
 
 const JohnGaHashiru = new SubjectIntransitive(john, hashiru);
 
-console.log(">JohnGaHashiru.toString()");
 console.log(JohnGaHashiru.toString()); //ジョンが走る
 
-
-console.log(">JohnGaHashiru.translate().toString()");
 console.log(JohnGaHashiru.translate().toString()); // λX.↓X(j)(↑RUN)
 
-console.log(">JohnGaHashiru.translate().reduction().toString()");
-console.log(JohnGaHashiru.translate().reduction().toString()); // λX.↓X(j)(↑RUN)
+console.log(JohnGaHashiru.translate().reduction().toString()); // RUN(j)
 
-console.log(">JohnGaHashiru.translate().valuation(model, w0, g))");
 console.log(JohnGaHashiru.translate().valuation(model, w0, g)); // Truth {type: "t", value: true}

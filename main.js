@@ -26,6 +26,29 @@ class ComplexValue {
         this.value = value;
     }
 }
+// g_[x/d]
+function assign(g, variable, value) {
+    return v => v.name === variable.name ? value : g(v);
+}
+class Model {
+    constructor(domain, worlds) {
+        this.domain = domain;
+        this.worlds = worlds;
+    }
+    interpretationDomain(type) {
+        if (type === "t")
+            return [new Truth(true), new Truth(false)];
+        if (type === "e")
+            return [...this.domain];
+        if (type === "s")
+            return [...this.worlds];
+        const aa = this.interpretationDomain(type[0]);
+        const bb = this.interpretationDomain(type[1]);
+        // bbのaa.lengthタプル（全組み合わせ）の配列を作る
+        const table = aa.reduce((prev) => bb.map(b => prev.map(t => [b, ...t, b])).reduce((a, b) => a.concat(b), []), [[]]);
+        return table.map(t => new ComplexValue(type, (x) => t[aa.findIndex(y => equals(x, y))]));
+    }
+}
 class Variable {
     constructor(name, type) {
         this.sort = "variable";
@@ -207,6 +230,31 @@ class Iff {
     }
     ;
 }
+class Equal {
+    constructor(formula0, formula1) {
+        this.sort = "＝";
+        this.type = "t";
+        this.formula0 = formula0;
+        this.formula1 = formula1;
+    }
+    ;
+    valuation(m, w, g) {
+        return new Truth(equals(this.formula0.valuation(m, w, g), this.formula0.valuation(m, w, g)));
+    }
+    freeVariables() {
+        return [...this.formula0.freeVariables(), ...this.formula1.freeVariables()];
+    }
+    replace(search, replacer) {
+        return new Equal(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
+    }
+    reduction() {
+        return new Equal(this.formula0, this.formula1);
+    }
+    toString() {
+        return this.formula0.toString() + "＝" + this.formula1.toString();
+    }
+    ;
+}
 class Exist {
     constructor(variable, formula) {
         this.sort = "∃";
@@ -276,31 +324,6 @@ class All {
     }
     toString() {
         return "∀" + this.variable.toString() + "." + this.formula.toString();
-    }
-    ;
-}
-class Equal {
-    constructor(formula0, formula1) {
-        this.sort = "＝";
-        this.type = "t";
-        this.formula0 = formula0;
-        this.formula1 = formula1;
-    }
-    ;
-    valuation(m, w, g) {
-        return new Truth(equals(this.formula0.valuation(m, w, g), this.formula0.valuation(m, w, g)));
-    }
-    freeVariables() {
-        return [...this.formula0.freeVariables(), ...this.formula1.freeVariables()];
-    }
-    replace(search, replacer) {
-        return new Equal(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
-    }
-    reduction() {
-        return new Equal(this.formula0, this.formula1);
-    }
-    toString() {
-        return this.formula0.toString() + "＝" + this.formula1.toString();
     }
     ;
 }
@@ -380,7 +403,7 @@ class Down {
         this.formula = formula;
     }
     valuation(m, w, g) {
-        return apply(this.formula.valuation(m, w, g), w);
+        return this.formula.valuation(m, w, g).value(w);
     }
     freeVariables() {
         return this.formula.freeVariables();
@@ -443,7 +466,7 @@ class Apply {
         this.type = type;
     }
     valuation(m, w, g) {
-        return apply(this.formula0.valuation(m, w, g), (this.formula1.valuation(m, w, g)));
+        return this.formula0.valuation(m, w, g).value((this.formula1.valuation(m, w, g)));
     }
     freeVariables() {
         return [...this.formula0.freeVariables(), ...this.formula1.freeVariables()];
@@ -474,32 +497,6 @@ function equals(a, b) {
         return false;
     throw new Error("関数同士の比較は未対応（モデルを見なきゃいけないので面倒）");
     //return m.interpretationDomain(a.type[0]).every(x => equals(m, apply(a, x), apply(b, x)));
-}
-function apply(func, x) {
-    return func.value(x);
-}
-class Model {
-    constructor(domain, worlds) {
-        this.domain = domain;
-        this.worlds = worlds;
-    }
-    interpretationDomain(type) {
-        if (type === "t")
-            return [new Truth(true), new Truth(false)];
-        if (type === "e")
-            return [...this.domain];
-        if (type === "s")
-            return [...this.worlds];
-        const aa = this.interpretationDomain(type[0]);
-        const bb = this.interpretationDomain(type[1]);
-        // bbのaa.lengthタプル（全組み合わせ）の配列を作る
-        const table = aa.reduce((prev) => bb.map(b => prev.map(t => [b, ...t, b])).reduce((a, b) => a.concat(b), []), [[]]);
-        return table.map(t => new ComplexValue(type, (x) => t[aa.findIndex(y => equals(x, y))]));
-    }
-}
-// g_[x/d]
-function assign(g, variable, value) {
-    return v => v.name === variable.name ? value : g(v);
 }
 class ProperNoun {
     constructor(literal, constant) {
@@ -593,11 +590,7 @@ const model = new Model([j, m], [new Situation("w0")]);
 const john = new ProperNoun("ジョン", new Constant("j", "e", w => j));
 const hashiru = new Intransitive("走る", new Constant("RUN", ["e", "t"], (w => new ComplexValue(["e", "t"], (e) => new Truth(equals(e, j))))));
 const JohnGaHashiru = new SubjectIntransitive(john, hashiru);
-console.log(">JohnGaHashiru.toString()");
 console.log(JohnGaHashiru.toString()); //ジョンが走る
-console.log(">JohnGaHashiru.translate().toString()");
 console.log(JohnGaHashiru.translate().toString()); // λX.↓X(j)(↑RUN)
-console.log(">JohnGaHashiru.translate().reduction().toString()");
-console.log(JohnGaHashiru.translate().reduction().toString()); // λX.↓X(j)(↑RUN)
-console.log(">JohnGaHashiru.translate().valuation(model, w0, g))");
+console.log(JohnGaHashiru.translate().reduction().toString()); // RUN(j)
 console.log(JohnGaHashiru.translate().valuation(model, w0, g)); // Truth {type: "t", value: true}
