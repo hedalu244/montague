@@ -587,16 +587,16 @@ const w0 = new Situation("w0");
 //適当な割り当て
 const g = (v) => model.interpretationDomain(v.type)[0];
 const model = new Model([j, i], [new Situation("w0")]);
-const john = new ProperNoun("ジョン", new Constant("j", "e", w => j));
-const hashiru = new Intransitive("走る", new Constant("RUN", ["e", "t"], (w => new ComplexValue(["e", "t"], (e) => new Truth(equals(e, j))))));
-const shounen = new CommonNoun("少年", new Constant("BOY", ["e", "t"], (w => new ComplexValue(["e", "t"], (e) => new Truth(equals(e, j) || equals(e, i))))));
-const JohnGaHashiru = new SubjectIntransitive(john, hashiru);
-console.log(JohnGaHashiru.toString()); //ジョンが走る
-console.log(JohnGaHashiru.translate().toString()); // λX.↓X(j)(↑RUN)
-console.log(JohnGaHashiru.translate().reduce().toString()); // RUN(j)
-console.log(JohnGaHashiru.translate().valuation(model, w0, g)); // Truth {type: "t", value: true}
-const SubetenoShounenGaHashiru = new SubjectIntransitive(new Every(shounen), hashiru);
-console.log(SubetenoShounenGaHashiru.toString()); //ジョンが走る
-console.log(SubetenoShounenGaHashiru.translate().toString()); // λX.↓X(j)(↑RUN)
-console.log(SubetenoShounenGaHashiru.translate().reduce().toString()); // RUN(j)
-console.log(SubetenoShounenGaHashiru.translate().valuation(model, w0, g)); // Truth {type: "t", value: true}
+const john = new Constant("j", "e", w => j);
+const run = new Constant("RUN", ["e", "t"], (w => new ComplexValue(["e", "t"], (e) => new Truth(equals(e, j)))));
+const boy = new Constant("BOY", ["e", "t"], (w => new ComplexValue(["e", "t"], (e) => new Truth(equals(e, j) || equals(e, i)))));
+const johnGaHashiru = new SubjectIntransitive(new ProperNoun("ジョン", john), new Intransitive("走る", run));
+console.log(johnGaHashiru.toString()); //ジョンが走る
+console.log(johnGaHashiru.translate().toString()); // λX.↓X(j)(↑RUN)
+console.log(johnGaHashiru.translate().reduce().toString()); // RUN(j)
+console.log(johnGaHashiru.translate().valuation(model, w0, g)); // Truth {type: "t", value: true}
+const subetenoShounenGaHashiru = new SubjectIntransitive(new Every(new CommonNoun("少年", boy)), new Intransitive("走る", run));
+console.log(subetenoShounenGaHashiru.toString()); //すべての少年が走る
+console.log(subetenoShounenGaHashiru.translate().toString()); // λX.∀x.BOY(x)⇒↓X(x)(↑RUN)
+console.log(subetenoShounenGaHashiru.translate().reduce().toString()); // ∀x.BOY(x)⇒RUN(x)
+console.log(subetenoShounenGaHashiru.translate().valuation(model, w0, g)); // Truth {type: "t", value: false}
