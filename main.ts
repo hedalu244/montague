@@ -342,17 +342,15 @@ function assign<A extends Type>(
     return v => v.name === variable.name ? value : g(v);
 }
 
-
-type Categoly = "t" | "e" | [Categoly, Categoly];
-
-
-interface Expression<C extends Categoly, T extends Type> {
+interface Expression<Categoly extends string, T extends Type> {
     transrate: () => Formula<T>;
+    readonly categoly: Categoly;
 }
 
-class ProperNoun implements Expression<"e", [["s", ["e", "t"]], "t"]> {
+class ProperNoun implements Expression<"T", [["s", ["e", "t"]], "t"]> {
     readonly constant: Constant<"e">;
     readonly literal: string;
+    readonly categoly = "T";
     constructor(literal: string, constant: Constant<"e">) {
         this.literal = literal;
         this.constant = constant;
@@ -375,6 +373,110 @@ class ProperNoun implements Expression<"e", [["s", ["e", "t"]], "t"]> {
     }
 }
 
+class CommonNoun implements Expression<"CN", ["e", "t"]> {
+    readonly constant: Constant<["e", "t"]>;
+    readonly literal: string;
+    readonly categoly = "CN";
+    constructor(literal: string, constant: Constant<["e", "t"]>) {
+        this.literal = literal;
+        this.constant = constant;
+    }
+    transrate() {
+        return this.constant;
+    }
+    toString() {
+        return this.literal;
+    }
+}
+
+class Intransitive implements Expression<"IV", ["e", "t"]> {
+    readonly constant: Constant<["e", "t"]>;
+    readonly literal: string;
+    readonly categoly = "IV";
+    constructor(literal: string, constant: Constant<["e", "t"]>) {
+        this.literal = literal;
+        this.constant = constant;
+    }
+    transrate() {
+        return this.constant;
+    }
+    toString() {
+        return this.literal;
+    }
+}
+
+//T_gaは面倒なので省略
+class SubjectIntransitive implements Expression<"t", "t"> {
+    readonly subject: Expression<"T", [["s", ["e", "t"]], "t"]>;
+    readonly intransitive: Expression<"IV", ["e", "t"]>;
+    readonly categoly = "t";
+    constructor(subject: Expression<"T", [["s", ["e", "t"]], "t"]>, intransitive: Expression<"IV", ["e", "t"]>) {
+        this.subject = subject;
+        this.intransitive = intransitive;
+    }
+    transrate() {
+        //α (↑δ)
+        return new Apply(
+            this.subject.transrate(),
+            new Up(this.intransitive.transrate(), ["s", ["e", "t"]]),
+            "t");
+    }
+    toString() {
+        return this.subject.toString() + "が" + this.intransitive.toString();
+    }
+}
+
+//T_oは省略
+class ObjectTransitive implements Expression<"IV", ["e", "t"]> {
+    readonly object: Expression<"T", [["s", ["e", "t"]], "t"]>;
+    readonly transitive: Expression<"IV/T", [["s", [["s", ["e", "t"]], "t"]], ["e", "t"]]>;
+    readonly categoly = "IV";
+    constructor(object: Expression<"T", [["s", ["e", "t"]], "t"]>, transitive: Expression<"IV/T", [["s", [["s", ["e", "t"]], "t"]], ["e", "t"]]>) {
+        this.object = object;
+        this.transitive = transitive;
+    }
+    transrate() {
+        //δ (↑β)
+        return new Apply(
+            this.transitive.transrate(),
+            new Up(this.object.transrate(), ["s", [["s", ["e", "t"]], "t"]]),
+            ["e", "t"]);
+    }
+    toString() {
+        return this.object.toString() + "を" + this.transitive.toString();
+    }
+}
+
+class Every implements Expression<"T", [["s", ["e", "t"]], "t"]> {
+    readonly commonNoun: Expression<"CN", ["e", "t"]>;
+    readonly categoly = "T";
+    constructor(literal: string, commonNoun: Expression<"CN", ["e", "t"]>) {
+        this.commonNoun = commonNoun;
+    }
+    transrate() {
+        // λX ∀x (commonNoun.transrate(x)⇒↓X(x))
+        return new Lambda(
+            new Variable("X", ["s", ["e", "t"]]),
+            new All(
+                new Variable("x", "e"),
+                new If(
+                    new Apply(
+                        this.commonNoun.transrate(),
+                        new Variable("x", "e"),
+                        "t"),
+                    new Apply(
+                        new Down(
+                            new Variable("X", ["s", ["e", "t"]]),
+                            ["e", "t"]),
+                        new Variable("x", "e"),
+                        "t"))),
+            [["s", ["e", "t"]], "t"]);
+    }
+    toString() {
+        return "すべての" + this.commonNoun.toString();
+    }
+}
+
 const j = new Entity("j");
 const m = new Entity("g");
 const w0 = new Situation("w0");
@@ -383,8 +485,14 @@ const g: Assignment = (v) => model.interpretationDomain(v.type)[0];
 
 const model = new Model([j, m], [new Situation("w0")]);
 
-const run = new Up(new Constant("run", ["e", "t"], (w => new ComplexValue(["e", "t"], (e) => new Truth(equals(model, e, j))))), ["s", ["e", "t"]]);
+const john = new ProperNoun("ジョン", new Constant("j", "e", w => j));
 
-const john = new ProperNoun("john", new Constant("j", "e", w => j));
+const hashiru = new Intransitive("走る", new Constant("RUN", ["e", "t"], (w => new ComplexValue(["e", "t"], (e) => new Truth(equals(model, e, j))))));
 
-console.log(new Apply(john.transrate(), run, "t").valuation(model, w0, g));
+const JohnGaHashiru = new SubjectIntransitive(john, hashiru);
+
+console.log(JohnGaHashiru.toString()); //ジョンが走る
+
+console.log(JohnGaHashiru.transrate().toString()); // λX.↓X(j)(↑RUN)
+
+console.log(JohnGaHashiru.transrate().valuation(model, w0, g)); // Truth {type: "t", value: true}
