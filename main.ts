@@ -148,7 +148,7 @@ class Not implements Formula<"t"> {
         return new Not(this.formula.replace(search, replacer));
     }
     reduce(): Formula<"t"> {
-        return new Not(this.formula);
+        return new Not(this.formula.reduce());
     }
     toString() {
         return "￢" + this.formula.toString();
@@ -173,7 +173,7 @@ class And implements Formula<"t"> {
         return new And(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
     }
     reduce(): Formula<"t"> {
-        return new And(this.formula0, this.formula1);
+        return new And(this.formula0.reduce(), this.formula1.reduce());
     }
     toString() {
         return this.formula0.toString() + "∧" + this.formula1.toString();
@@ -198,7 +198,7 @@ class Or implements Formula<"t"> {
         return new Or(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
     }
     reduce(): Formula<"t"> {
-        return new Or(this.formula0, this.formula1);
+        return new Or(this.formula0.reduce(), this.formula1.reduce());
     }
     toString() {
         return this.formula0.toString() + "∨" + this.formula1.toString();
@@ -223,7 +223,7 @@ class If implements Formula<"t"> {
         return new If(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
     }
     reduce(): Formula<"t"> {
-        return new If(this.formula0, this.formula1);
+        return new If(this.formula0.reduce(), this.formula1.reduce());
     }
     toString() {
         return this.formula0.toString() + "⇒" + this.formula1.toString();
@@ -248,7 +248,7 @@ class Iff implements Formula<"t"> {
         return new Iff(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
     }
     reduce(): Formula<"t"> {
-        return new Iff(this.formula0, this.formula1);
+        return new Iff(this.formula0.reduce(), this.formula1.reduce());
     }
     toString() {
         return this.formula0.toString() + "⇔" + this.formula1.toString();
@@ -273,7 +273,7 @@ class Equal<A extends Type> implements Formula<"t"> {
         return new Equal(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
     }
     reduce(): Formula<"t"> {
-        return new Equal(this.formula0, this.formula1);
+        return new Equal(this.formula0.reduce(), this.formula1.reduce());
     }
     toString() {
         return this.formula0.toString() + "＝" + this.formula1.toString();
@@ -310,7 +310,7 @@ class Exist<A extends Type> implements Formula<"t"> {
         return new Exist(this.variable, this.formula.replace(search, replacer));
     }
     reduce(): Formula<"t"> {
-        return new Exist(this.variable, this.formula);
+        return new Exist(this.variable, this.formula.reduce());
     }
     toString() {
         return "∃" + this.variable.toString() + "." + this.formula.toString();
@@ -347,7 +347,7 @@ class All<A extends Type> implements Formula<"t"> {
         return new All(this.variable, this.formula.replace(search, replacer));
     }
     reduce(): Formula<"t"> {
-        return new All(this.variable, this.formula);
+        return new All(this.variable, this.formula.reduce());
     }
     toString() {
         return "∀" + this.variable.toString() + "." + this.formula.toString();
@@ -370,7 +370,7 @@ class Must implements Formula<"t"> {
         return new Must(this.formula.replace(search, replacer));
     }
     reduce(): Formula<"t"> {
-        return new Must(this.formula);
+        return new Must(this.formula.reduce());
     }
     toString() {
         return "□" + this.formula.toString();
@@ -393,7 +393,7 @@ class May implements Formula<"t"> {
         return new May(this.formula.replace(search, replacer));
     }
     reduce(): Formula<"t"> {
-        return new May(this.formula);
+        return new May(this.formula.reduce());
     }
     toString() {
         return "◇" + this.formula.toString();
@@ -417,7 +417,7 @@ class Up<A extends Type> implements Formula<["s", A]> {
         return new Up(this.formula.replace(search, replacer), this.type);
     }
     reduce(): Formula<["s", A]> {
-        return new Up(this.formula, this.type);
+        return new Up(this.formula.reduce(), this.type);
     }
     toString() {
         return "↑" + this.formula.toString();
@@ -484,7 +484,7 @@ class Lambda<A extends Type, B extends Type> implements Formula<[A, B]> {
         return new Lambda(this.variable, this.formula.replace(search, replacer), this.type);
     }
     reduce(): Formula<[A, B]> {
-        return new Lambda(this.variable, this.formula, this.type);
+        return new Lambda(this.variable, this.formula.reduce(), this.type);
     }
     toString() {
         return "λ" + this.variable.toString() + "." + this.formula.toString();
@@ -644,7 +644,7 @@ class ObjectTransitive implements Expression<"IV", ["e", "t"]> {
 class Every implements Expression<"T", [["s", ["e", "t"]], "t"]> {
     readonly commonNoun: Expression<"CN", ["e", "t"]>;
     readonly categoly = "T";
-    constructor(literal: string, commonNoun: Expression<"CN", ["e", "t"]>) {
+    constructor(commonNoun: Expression<"CN", ["e", "t"]>) {
         this.commonNoun = commonNoun;
     }
     translate() {
@@ -672,23 +672,30 @@ class Every implements Expression<"T", [["s", ["e", "t"]], "t"]> {
 }
 
 const j = new Entity("j");
-const m = new Entity("g");
+const i = new Entity("i");
 const w0 = new Situation("w0");
 //適当な割り当て
 const g: Assignment = (v) => model.interpretationDomain(v.type)[0];
 
-const model = new Model([j, m], [new Situation("w0")]);
+const model = new Model([j, i], [new Situation("w0")]);
 
 const john = new ProperNoun("ジョン", new Constant("j", "e", w => j));
 
 const hashiru = new Intransitive("走る", new Constant("RUN", ["e", "t"], (w => new ComplexValue(["e", "t"], (e) => new Truth(equals(e, j))))));
 
+const shounen = new CommonNoun("少年", new Constant("BOY", ["e", "t"], (w => new ComplexValue(["e", "t"], (e) => new Truth(equals(e, j) || equals(e, i))))));
+
 const JohnGaHashiru = new SubjectIntransitive(john, hashiru);
 
 console.log(JohnGaHashiru.toString()); //ジョンが走る
-
 console.log(JohnGaHashiru.translate().toString()); // λX.↓X(j)(↑RUN)
-
 console.log(JohnGaHashiru.translate().reduce().toString()); // RUN(j)
-
 console.log(JohnGaHashiru.translate().valuation(model, w0, g)); // Truth {type: "t", value: true}
+
+const SubetenoShounenGaHashiru = new SubjectIntransitive(new Every(shounen), hashiru);
+
+
+console.log(SubetenoShounenGaHashiru.toString()); //ジョンが走る
+console.log(SubetenoShounenGaHashiru.translate().toString()); // λX.↓X(j)(↑RUN)
+console.log(SubetenoShounenGaHashiru.translate().reduce().toString()); // RUN(j)
+console.log(SubetenoShounenGaHashiru.translate().valuation(model, w0, g)); // Truth {type: "t", value: true}
