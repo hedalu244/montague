@@ -247,7 +247,7 @@ class Down {
     }
     ;
 }
-class Lamda {
+class Lambda {
     constructor(variable, expr, type) {
         this.sort = "λ";
         this.variable = variable;
@@ -315,3 +315,12 @@ class Model {
 function assign(g, variable, value) {
     return v => v.name === variable.name ? value : g(v);
 }
+const j = new Entity("j");
+const m = new Entity("g");
+const w0 = new Situation("w0");
+//適当な割り当て
+const g = (v) => model.interpretationDomain(v.type)[0];
+const model = new Model([j, m], [new Situation("w0")]);
+const run = new Constant("run", ["e", "t"], (w => new ComplexValue(["e", "t"], (e) => new Truth(equals(model, e, j)))));
+const john = new Lambda(new Variable("X", ["e", "t"]), new Apply(new Variable("X", ["e", "t"]), new Constant("j", "e", w => g), "t"), [["e", "t"], "t"]);
+console.log(new Apply(john, run, "t").valuation(model, w0, g));

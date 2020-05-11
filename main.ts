@@ -260,7 +260,7 @@ class Down<A extends Type> implements ME<A> {
         return "↓" + this.expr.toString();
     };
 }
-class Lamda<A extends Type, B extends Type> implements ME<[A, B]> {
+class Lambda<A extends Type, B extends Type> implements ME<[A, B]> {
     readonly sort = "λ";
     readonly type: [A, B];
     readonly variable: Variable<A>;
@@ -341,3 +341,17 @@ function assign<A extends Type>(
     value: TypeValue<A>): Assignment {
     return v => v.name === variable.name ? value : g(v);
 }
+
+const j = new Entity("j");
+const m = new Entity("g");
+const w0 = new Situation("w0");
+//適当な割り当て
+const g: Assignment = (v) => model.interpretationDomain(v.type)[0];
+
+const model = new Model([j, m], [new Situation("w0")])
+
+const run = new Constant("run", ["e", "t"], (w => new ComplexValue(["e", "t"], (e) => new Truth(equals(model, e, j)) )));
+
+const john = new Lambda(new Variable("X", ["e", "t"]), new Apply(new Variable("X", ["e", "t"]), new Constant("j", "e", w=>g), "t"), [["e", "t"], "t"]);
+
+console.log(new Apply(john, run, "t").valuation(model, w0, g));
