@@ -315,6 +315,19 @@ class Model {
 function assign(g, variable, value) {
     return v => v.name === variable.name ? value : g(v);
 }
+class ProperNoun {
+    constructor(literal, constant) {
+        this.literal = literal;
+        this.constant = constant;
+    }
+    transrate() {
+        // λX.(↓X)(constant)
+        return new Lambda(new Variable("X", ["s", ["e", "t"]]), new Apply(new Down(new Variable("X", ["s", ["e", "t"]]), ["e", "t"]), this.constant, "t"), [["s", ["e", "t"]], "t"]);
+    }
+    toString() {
+        return this.name;
+    }
+}
 const j = new Entity("j");
 const m = new Entity("g");
 const w0 = new Situation("w0");
@@ -322,5 +335,5 @@ const w0 = new Situation("w0");
 const g = (v) => model.interpretationDomain(v.type)[0];
 const model = new Model([j, m], [new Situation("w0")]);
 const run = new Up(new Constant("run", ["e", "t"], (w => new ComplexValue(["e", "t"], (e) => new Truth(equals(model, e, j))))), ["s", ["e", "t"]]);
-const john = new Lambda(new Variable("X", ["s", ["e", "t"]]), new Apply(new Down(new Variable("X", ["s", ["e", "t"]]), ["e", "t"]), new Constant("j", "e", w => j), "t"), [["s", ["e", "t"]], "t"]);
-console.log(new Apply(john, run, "t").valuation(model, w0, g));
+const john = new ProperNoun("john", new Constant("j", "e", w => j));
+console.log(new Apply(john.transrate(), run, "t").valuation(model, w0, g));
