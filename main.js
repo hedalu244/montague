@@ -37,6 +37,18 @@ class Variable {
         return g(this);
     }
     ;
+    freeVariables() {
+        return [this];
+    }
+    replace(search, replacer) {
+        if (this.name === search.name)
+            return replacer;
+        else
+            return this;
+    }
+    reduction() {
+        return this;
+    }
     toString() {
         return this.name;
     }
@@ -52,6 +64,15 @@ class Constant {
     ;
     valuation(m, w, g) {
         return this.interpretation(w);
+    }
+    freeVariables() {
+        return [];
+    }
+    replace(search, replacer) {
+        return this;
+    }
+    reduction() {
+        return this;
     }
     toString() {
         return this.name;
@@ -69,6 +90,15 @@ class Not {
         return new Truth(!this.formula.valuation(m, w, g).value);
     }
     ;
+    freeVariables() {
+        return this.formula.freeVariables();
+    }
+    replace(search, replacer) {
+        return new Not(this.formula.replace(search, replacer));
+    }
+    reduction() {
+        return new Not(this.formula);
+    }
     toString() {
         return "￢" + this.formula.toString();
     }
@@ -85,6 +115,15 @@ class And {
         return new Truth(this.formula0.valuation(m, w, g).value && this.formula1.valuation(m, w, g).value);
     }
     ;
+    freeVariables() {
+        return [...this.formula0.freeVariables(), ...this.formula1.freeVariables()];
+    }
+    replace(search, replacer) {
+        return new And(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
+    }
+    reduction() {
+        return new And(this.formula0, this.formula1);
+    }
     toString() {
         return this.formula0.toString() + "∧" + this.formula1.toString();
     }
@@ -102,6 +141,15 @@ class Or {
         return new Truth(this.formula0.valuation(m, w, g).value || this.formula1.valuation(m, w, g).value);
     }
     ;
+    freeVariables() {
+        return [...this.formula0.freeVariables(), ...this.formula1.freeVariables()];
+    }
+    replace(search, replacer) {
+        return new Or(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
+    }
+    reduction() {
+        return new Or(this.formula0, this.formula1);
+    }
     toString() {
         return this.formula0.toString() + "∨" + this.formula1.toString();
     }
@@ -119,6 +167,15 @@ class If {
         return new Truth(!this.formula0.valuation(m, w, g).value || this.formula1.valuation(m, w, g).value);
     }
     ;
+    freeVariables() {
+        return [...this.formula0.freeVariables(), ...this.formula1.freeVariables()];
+    }
+    replace(search, replacer) {
+        return new If(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
+    }
+    reduction() {
+        return new If(this.formula0, this.formula1);
+    }
     toString() {
         return this.formula0.toString() + "⇒" + this.formula1.toString();
     }
@@ -136,6 +193,15 @@ class Iff {
         return new Truth(this.formula0.valuation(m, w, g).value == this.formula1.valuation(m, w, g).value);
     }
     ;
+    freeVariables() {
+        return [...this.formula0.freeVariables(), ...this.formula1.freeVariables()];
+    }
+    replace(search, replacer) {
+        return new Iff(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
+    }
+    reduction() {
+        return new Iff(this.formula0, this.formula1);
+    }
     toString() {
         return this.formula0.toString() + "⇔" + this.formula1.toString();
     }
@@ -153,6 +219,25 @@ class Exist {
         return new Truth(m.interpretationDomain(this.variable.type).some(value => this.formula.valuation(m, w, assign(g, this.variable, value)).value));
     }
     ;
+    freeVariables() {
+        return this.formula.freeVariables().filter(x => x.name !== this.variable.name);
+    }
+    replace(search, replacer) {
+        // 置き換えたいののなかの自由出現と束縛変数の名前が衝突してたら
+        if (replacer.freeVariables().some(x => x.name === this.variable.name)) {
+            //衝突しない名前を模索して
+            let alt = "_" + this.variable.name;
+            while (replacer.freeVariables().some(x => x.name === this.variable.name))
+                alt = "_" + alt;
+            //置き換える
+            return new Exist(new Variable(alt, this.variable.type), this.formula.replace(this.variable, new Variable(alt, this.variable.type)).replace(search, replacer));
+        }
+        //問題なければそのまま再帰
+        return new Exist(this.variable, this.formula.replace(search, replacer));
+    }
+    reduction() {
+        return new Exist(this.variable, this.formula);
+    }
     toString() {
         return "∃" + this.variable.toString() + "." + this.formula.toString();
     }
@@ -170,6 +255,25 @@ class All {
         return new Truth(m.interpretationDomain(this.variable.type).every(value => this.formula.valuation(m, w, assign(g, this.variable, value)).value));
     }
     ;
+    freeVariables() {
+        return this.formula.freeVariables().filter(x => x.name !== this.variable.name);
+    }
+    replace(search, replacer) {
+        // 置き換えたいののなかの自由出現と束縛変数の名前が衝突してたら
+        if (replacer.freeVariables().some(x => x.name === this.variable.name)) {
+            //衝突しない名前を模索して
+            let alt = "_" + this.variable.name;
+            while (replacer.freeVariables().some(x => x.name === this.variable.name))
+                alt = "_" + alt;
+            //置き換える
+            return new All(new Variable(alt, this.variable.type), this.formula.replace(this.variable, new Variable(alt, this.variable.type)).replace(search, replacer));
+        }
+        //問題なければそのまま再帰
+        return new All(this.variable, this.formula.replace(search, replacer));
+    }
+    reduction() {
+        return new All(this.variable, this.formula);
+    }
     toString() {
         return "∀" + this.variable.toString() + "." + this.formula.toString();
     }
@@ -184,7 +288,16 @@ class Equal {
     }
     ;
     valuation(m, w, g) {
-        return new Truth(equals(m, this.formula0.valuation(m, w, g), this.formula0.valuation(m, w, g)));
+        return new Truth(equals(this.formula0.valuation(m, w, g), this.formula0.valuation(m, w, g)));
+    }
+    freeVariables() {
+        return [...this.formula0.freeVariables(), ...this.formula1.freeVariables()];
+    }
+    replace(search, replacer) {
+        return new Equal(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
+    }
+    reduction() {
+        return new Equal(this.formula0, this.formula1);
     }
     toString() {
         return this.formula0.toString() + "＝" + this.formula1.toString();
@@ -200,6 +313,15 @@ class Must {
     valuation(m, w, g) {
         return new Truth(m.worlds.every(_w => this.formula.valuation(m, _w, g).value));
     }
+    freeVariables() {
+        return this.formula.freeVariables();
+    }
+    replace(search, replacer) {
+        return new Must(this.formula.replace(search, replacer));
+    }
+    reduction() {
+        return new Must(this.formula);
+    }
     toString() {
         return "□" + this.formula.toString();
     }
@@ -213,6 +335,15 @@ class May {
     }
     valuation(m, w, g) {
         return new Truth(m.worlds.some(_w => this.formula.valuation(m, _w, g).value));
+    }
+    freeVariables() {
+        return this.formula.freeVariables();
+    }
+    replace(search, replacer) {
+        return new May(this.formula.replace(search, replacer));
+    }
+    reduction() {
+        return new May(this.formula);
     }
     toString() {
         return "◇" + this.formula.toString();
@@ -228,6 +359,15 @@ class Up {
     valuation(m, w, g) {
         return new ComplexValue(this.type, _w => this.formula.valuation(m, _w, g));
     }
+    freeVariables() {
+        return this.formula.freeVariables();
+    }
+    replace(search, replacer) {
+        return new Up(this.formula.replace(search, replacer), this.type);
+    }
+    reduction() {
+        return new Up(this.formula, this.type);
+    }
     toString() {
         return "↑" + this.formula.toString();
     }
@@ -241,6 +381,19 @@ class Down {
     }
     valuation(m, w, g) {
         return apply(this.formula.valuation(m, w, g), w);
+    }
+    freeVariables() {
+        return this.formula.freeVariables();
+    }
+    replace(search, replacer) {
+        return new Down(this.formula.replace(search, replacer), this.type);
+    }
+    reduction() {
+        // 簡約して、アップになったら消す
+        let formula = this.formula.reduction();
+        if (formula instanceof Up)
+            return formula.formula;
+        return new Down(formula, this.type);
     }
     toString() {
         return "↓" + this.formula.toString();
@@ -258,6 +411,25 @@ class Lambda {
     valuation(m, w, g) {
         return new ComplexValue(this.type, d => this.formula.valuation(m, w, assign(g, this.variable, d)));
     }
+    freeVariables() {
+        return this.formula.freeVariables().filter(x => x.name !== this.variable.name);
+    }
+    replace(search, replacer) {
+        // 置き換えたいののなかの自由出現と束縛変数の名前が衝突してたら
+        if (replacer.freeVariables().some(x => x.name === this.variable.name)) {
+            //衝突しない名前を模索して
+            let alt = "_" + this.variable.name;
+            while (replacer.freeVariables().some(x => x.name === this.variable.name))
+                alt = "_" + alt;
+            //置き換える
+            return new Lambda(new Variable(alt, this.variable.type), this.formula.replace(this.variable, new Variable(alt, this.variable.type)).replace(search, replacer), this.type);
+        }
+        //問題なければそのまま再帰
+        return new Lambda(this.variable, this.formula.replace(search, replacer), this.type);
+    }
+    reduction() {
+        return new Lambda(this.variable, this.formula, this.type);
+    }
     toString() {
         return "λ" + this.variable.toString() + "." + this.formula.toString();
     }
@@ -273,12 +445,25 @@ class Apply {
     valuation(m, w, g) {
         return apply(this.formula0.valuation(m, w, g), (this.formula1.valuation(m, w, g)));
     }
+    freeVariables() {
+        return [...this.formula0.freeVariables(), ...this.formula1.freeVariables()];
+    }
+    replace(search, replacer) {
+        return new Apply(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer), this.type);
+    }
+    reduction() {
+        // 関数側を簡約して、ラムダになったら置き換えして、また簡約
+        let formula0 = this.formula0.reduction();
+        if (formula0 instanceof Lambda)
+            return formula0.formula.replace(formula0.variable, this.formula1).reduction();
+        return new Apply(formula0, this.formula1.reduction(), this.type);
+    }
     toString() {
         return this.formula0.toString() + "(" + this.formula1.toString() + ")";
     }
     ;
 }
-function equals(m, a, b) {
+function equals(a, b) {
     if (a.type === "t")
         return b.type === "t" && a.value === b.value;
     if (a.type === "e")
@@ -287,7 +472,8 @@ function equals(m, a, b) {
         return b.type === "s" && a.id === b.id;
     if (b.type === "t" || b.type === "e" || b.type === "s")
         return false;
-    return m.interpretationDomain(a.type[0]).every(x => equals(m, apply(a, x), apply(b, x)));
+    throw new Error("関数同士の比較は未対応（モデルを見なきゃいけないので面倒）");
+    //return m.interpretationDomain(a.type[0]).every(x => equals(m, apply(a, x), apply(b, x)));
 }
 function apply(func, x) {
     return func.value(x);
@@ -308,7 +494,7 @@ class Model {
         const bb = this.interpretationDomain(type[1]);
         // bbのaa.lengthタプル（全組み合わせ）の配列を作る
         const table = aa.reduce((prev) => bb.map(b => prev.map(t => [b, ...t, b])).reduce((a, b) => a.concat(b), []), [[]]);
-        return table.map(t => new ComplexValue(type, (x) => t[aa.findIndex(y => equals(this, x, y))]));
+        return table.map(t => new ComplexValue(type, (x) => t[aa.findIndex(y => equals(x, y))]));
     }
 }
 // g_[x/d]
@@ -321,7 +507,7 @@ class ProperNoun {
         this.literal = literal;
         this.constant = constant;
     }
-    transrate() {
+    translate() {
         // λX.(↓X)(constant)
         return new Lambda(new Variable("X", ["s", ["e", "t"]]), new Apply(new Down(new Variable("X", ["s", ["e", "t"]]), ["e", "t"]), this.constant, "t"), [["s", ["e", "t"]], "t"]);
     }
@@ -335,7 +521,7 @@ class CommonNoun {
         this.literal = literal;
         this.constant = constant;
     }
-    transrate() {
+    translate() {
         return this.constant;
     }
     toString() {
@@ -348,7 +534,7 @@ class Intransitive {
         this.literal = literal;
         this.constant = constant;
     }
-    transrate() {
+    translate() {
         return this.constant;
     }
     toString() {
@@ -362,9 +548,9 @@ class SubjectIntransitive {
         this.subject = subject;
         this.intransitive = intransitive;
     }
-    transrate() {
+    translate() {
         //α (↑δ)
-        return new Apply(this.subject.transrate(), new Up(this.intransitive.transrate(), ["s", ["e", "t"]]), "t");
+        return new Apply(this.subject.translate(), new Up(this.intransitive.translate(), ["s", ["e", "t"]]), "t");
     }
     toString() {
         return this.subject.toString() + "が" + this.intransitive.toString();
@@ -377,9 +563,9 @@ class ObjectTransitive {
         this.object = object;
         this.transitive = transitive;
     }
-    transrate() {
+    translate() {
         //δ (↑β)
-        return new Apply(this.transitive.transrate(), new Up(this.object.transrate(), ["s", [["s", ["e", "t"]], "t"]]), ["e", "t"]);
+        return new Apply(this.transitive.translate(), new Up(this.object.translate(), ["s", [["s", ["e", "t"]], "t"]]), ["e", "t"]);
     }
     toString() {
         return this.object.toString() + "を" + this.transitive.toString();
@@ -390,9 +576,9 @@ class Every {
         this.categoly = "T";
         this.commonNoun = commonNoun;
     }
-    transrate() {
-        // λX ∀x (commonNoun.transrate(x)⇒↓X(x))
-        return new Lambda(new Variable("X", ["s", ["e", "t"]]), new All(new Variable("x", "e"), new If(new Apply(this.commonNoun.transrate(), new Variable("x", "e"), "t"), new Apply(new Down(new Variable("X", ["s", ["e", "t"]]), ["e", "t"]), new Variable("x", "e"), "t"))), [["s", ["e", "t"]], "t"]);
+    translate() {
+        // λX ∀x (commonNoun.translate(x)⇒↓X(x))
+        return new Lambda(new Variable("X", ["s", ["e", "t"]]), new All(new Variable("x", "e"), new If(new Apply(this.commonNoun.translate(), new Variable("x", "e"), "t"), new Apply(new Down(new Variable("X", ["s", ["e", "t"]]), ["e", "t"]), new Variable("x", "e"), "t"))), [["s", ["e", "t"]], "t"]);
     }
     toString() {
         return "すべての" + this.commonNoun.toString();
@@ -405,8 +591,13 @@ const w0 = new Situation("w0");
 const g = (v) => model.interpretationDomain(v.type)[0];
 const model = new Model([j, m], [new Situation("w0")]);
 const john = new ProperNoun("ジョン", new Constant("j", "e", w => j));
-const hashiru = new Intransitive("走る", new Constant("RUN", ["e", "t"], (w => new ComplexValue(["e", "t"], (e) => new Truth(equals(model, e, j))))));
+const hashiru = new Intransitive("走る", new Constant("RUN", ["e", "t"], (w => new ComplexValue(["e", "t"], (e) => new Truth(equals(e, j))))));
 const JohnGaHashiru = new SubjectIntransitive(john, hashiru);
+console.log(">JohnGaHashiru.toString()");
 console.log(JohnGaHashiru.toString()); //ジョンが走る
-console.log(JohnGaHashiru.transrate().toString()); // λX.↓X(j)(↑RUN)
-console.log(JohnGaHashiru.transrate().valuation(model, w0, g)); // Truth {type: "t", value: true}
+console.log(">JohnGaHashiru.translate().toString()");
+console.log(JohnGaHashiru.translate().toString()); // λX.↓X(j)(↑RUN)
+console.log(">JohnGaHashiru.translate().reduction().toString()");
+console.log(JohnGaHashiru.translate().reduction().toString()); // λX.↓X(j)(↑RUN)
+console.log(">JohnGaHashiru.translate().valuation(model, w0, g))");
+console.log(JohnGaHashiru.translate().valuation(model, w0, g)); // Truth {type: "t", value: true}

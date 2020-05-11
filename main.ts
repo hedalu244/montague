@@ -41,7 +41,13 @@ type Assignment = <B extends Type>(_: Variable<B>) => TypeValue<B>;
 
 interface Formula<A extends Type> {
     type: Type;
-    valuation: (m: Model, w: Situation, g: Assignment) => TypeValue<A>;
+    valuation(m: Model, w: Situation, g: Assignment): TypeValue<A>;
+    // 自由変数の列挙
+    freeVariables(): Variable<Type>[];
+    // 指定の変数を探して指定の置き換え式を代入する
+    replace<B extends Type>(search: Variable<B>, replacer: Formula<B>): Formula<A>;
+    // λ簡約、↓↑打ち消し
+    reduction(): Formula<A>;
 }
 
 class Variable<A extends Type> implements Formula<A> {
@@ -55,6 +61,16 @@ class Variable<A extends Type> implements Formula<A> {
     valuation(m: Model, w: Situation, g: Assignment): TypeValue<A> {
         return g(this);
     };
+    freeVariables(): Variable<Type>[] {
+        return [this];
+    }
+    replace<B extends Type>(search: Variable<B>, replacer: Formula<B>): Formula<A> {
+        if (this.name === search.name) return replacer;
+        else return this;
+    }
+    reduction(): Formula<A> {
+        return this;
+    }
     toString() {
         return this.name;
     };
@@ -72,6 +88,15 @@ class Constant<A extends Type> implements Formula<A> {
     valuation(m: Model, w: Situation, g: Assignment): TypeValue<A> {
         return this.interpretation(w);
     }
+    freeVariables(): Variable<Type>[] {
+        return [];
+    }
+    replace<B extends Type>(search: Variable<B>, replacer: Formula<B>): Formula<A> {
+        return this;
+    }
+    reduction(): Formula<A> {
+        return this;
+    }
     toString() {
         return this.name;
     };
@@ -86,6 +111,15 @@ class Not implements Formula<"t"> {
     valuation(m: Model, w: Situation, g: Assignment): Truth {
         return new Truth(!this.formula.valuation(m, w, g).value);
     };
+    freeVariables(): Variable<Type>[] {
+        return this.formula.freeVariables();
+    }
+    replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<"t"> {
+        return new Not(this.formula.replace(search, replacer));
+    }
+    reduction(): Formula<"t"> {
+        return new Not(this.formula);
+    }
     toString() {
         return "￢" + this.formula.toString();
     }
@@ -102,6 +136,15 @@ class And implements Formula<"t"> {
     valuation(m: Model, w: Situation, g: Assignment): Truth {
         return new Truth(this.formula0.valuation(m, w, g).value && this.formula1.valuation(m, w, g).value);
     };
+    freeVariables(): Variable<Type>[] {
+        return [...this.formula0.freeVariables(), ...this.formula1.freeVariables()];
+    }
+    replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<"t"> {
+        return new And(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
+    }
+    reduction(): Formula<"t"> {
+        return new And(this.formula0, this.formula1);
+    }
     toString() {
         return this.formula0.toString() + "∧" + this.formula1.toString();
     };
@@ -118,6 +161,15 @@ class Or implements Formula<"t"> {
     valuation(m: Model, w: Situation, g: Assignment): Truth {
         return new Truth(this.formula0.valuation(m, w, g).value || this.formula1.valuation(m, w, g).value);
     };
+    freeVariables(): Variable<Type>[] {
+        return [...this.formula0.freeVariables(), ...this.formula1.freeVariables()];
+    }
+    replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<"t"> {
+        return new Or(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
+    }
+    reduction(): Formula<"t"> {
+        return new Or(this.formula0, this.formula1);
+    }
     toString() {
         return this.formula0.toString() + "∨" + this.formula1.toString();
     };
@@ -134,6 +186,15 @@ class If implements Formula<"t"> {
     valuation(m: Model, w: Situation, g: Assignment): Truth {
         return new Truth(!this.formula0.valuation(m, w, g).value || this.formula1.valuation(m, w, g).value);
     };
+    freeVariables(): Variable<Type>[] {
+        return [...this.formula0.freeVariables(), ...this.formula1.freeVariables()];
+    }
+    replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<"t"> {
+        return new If(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
+    }
+    reduction(): Formula<"t"> {
+        return new If(this.formula0, this.formula1);
+    }
     toString() {
         return this.formula0.toString() + "⇒" + this.formula1.toString();
     };
@@ -150,6 +211,15 @@ class Iff implements Formula<"t"> {
     valuation(m: Model, w: Situation, g: Assignment): Truth {
         return new Truth(this.formula0.valuation(m, w, g).value == this.formula1.valuation(m, w, g).value);
     };
+    freeVariables(): Variable<Type>[] {
+        return [...this.formula0.freeVariables(), ...this.formula1.freeVariables()];
+    }
+    replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<"t"> {
+        return new Iff(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
+    }
+    reduction(): Formula<"t"> {
+        return new Iff(this.formula0, this.formula1);
+    }
     toString() {
         return this.formula0.toString() + "⇔" + this.formula1.toString();
     };
@@ -166,6 +236,27 @@ class Exist<A extends Type> implements Formula<"t"> {
     valuation(m: Model, w: Situation, g: Assignment): Truth {
         return new Truth(m.interpretationDomain(this.variable.type).some(value => this.formula.valuation(m, w, assign(g, this.variable, value)).value));
     };
+    freeVariables(): Variable<Type>[] {
+        return this.formula.freeVariables().filter(x => x.name !== this.variable.name);
+    }
+    replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<"t"> {
+        // 置き換えたいののなかの自由出現と束縛変数の名前が衝突してたら
+        if (replacer.freeVariables().some(x => x.name === this.variable.name)) {
+            //衝突しない名前を模索して
+            let alt = "_" + this.variable.name;
+            while (replacer.freeVariables().some(x => x.name === this.variable.name)) alt = "_" + alt;
+            //置き換える
+            return new Exist(
+                new Variable(alt, this.variable.type),
+                this.formula.replace(this.variable, new Variable(alt, this.variable.type)).replace(search, replacer)
+            );
+        }
+        //問題なければそのまま再帰
+        return new Exist(this.variable, this.formula.replace(search, replacer));
+    }
+    reduction(): Formula<"t"> {
+        return new Exist(this.variable, this.formula);
+    }
     toString() {
         return "∃" + this.variable.toString() + "." + this.formula.toString();
     };
@@ -182,6 +273,27 @@ class All<A extends Type> implements Formula<"t"> {
     valuation(m: Model, w: Situation, g: Assignment): Truth {
         return new Truth(m.interpretationDomain(this.variable.type).every(value => this.formula.valuation(m, w, assign(g, this.variable, value)).value));
     };
+    freeVariables(): Variable<Type>[] {
+        return this.formula.freeVariables().filter(x => x.name !== this.variable.name);
+    }
+    replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<"t"> {
+        // 置き換えたいののなかの自由出現と束縛変数の名前が衝突してたら
+        if (replacer.freeVariables().some(x => x.name === this.variable.name)) {
+            //衝突しない名前を模索して
+            let alt = "_" + this.variable.name;
+            while (replacer.freeVariables().some(x => x.name === this.variable.name)) alt = "_" + alt;
+            //置き換える
+            return new All(
+                new Variable(alt, this.variable.type),
+                this.formula.replace(this.variable, new Variable(alt, this.variable.type)).replace(search, replacer)
+            );
+        }
+        //問題なければそのまま再帰
+        return new All(this.variable, this.formula.replace(search, replacer));
+    }
+    reduction(): Formula<"t"> {
+        return new All(this.variable, this.formula);
+    }
     toString() {
         return "∀" + this.variable.toString() + "." + this.formula.toString();
     };
@@ -196,7 +308,16 @@ class Equal<A extends Type> implements Formula<"t"> {
         this.formula1 = formula1;
     };
     valuation(m: Model, w: Situation, g: Assignment): Truth {
-        return new Truth(equals(m, this.formula0.valuation(m, w, g), this.formula0.valuation(m, w, g)));
+        return new Truth(equals(this.formula0.valuation(m, w, g), this.formula0.valuation(m, w, g)));
+    }
+    freeVariables(): Variable<Type>[] {
+        return [...this.formula0.freeVariables(), ...this.formula1.freeVariables()];
+    }
+    replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<"t"> {
+        return new Equal(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer));
+    }
+    reduction(): Formula<"t"> {
+        return new Equal(this.formula0, this.formula1);
     }
     toString() {
         return this.formula0.toString() + "＝" + this.formula1.toString();
@@ -212,6 +333,15 @@ class Must implements Formula<"t"> {
     valuation(m: Model, w: Situation, g: Assignment): Truth {
         return new Truth(m.worlds.every(_w => this.formula.valuation(m, _w, g).value));
     }
+    freeVariables(): Variable<Type>[] {
+        return this.formula.freeVariables();
+    }
+    replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<"t"> {
+        return new Must(this.formula.replace(search, replacer));
+    }
+    reduction(): Formula<"t"> {
+        return new Must(this.formula);
+    }
     toString() {
         return "□" + this.formula.toString();
     };
@@ -225,6 +355,15 @@ class May implements Formula<"t"> {
     }
     valuation(m: Model, w: Situation, g: Assignment): Truth {
         return new Truth(m.worlds.some(_w => this.formula.valuation(m, _w, g).value));
+    }
+    freeVariables(): Variable<Type>[] {
+        return this.formula.freeVariables();
+    }
+    replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<"t"> {
+        return new May(this.formula.replace(search, replacer));
+    }
+    reduction(): Formula<"t"> {
+        return new May(this.formula);
     }
     toString() {
         return "◇" + this.formula.toString();
@@ -241,6 +380,15 @@ class Up<A extends Type> implements Formula<["s", A]> {
     valuation(m: Model, w: Situation, g: Assignment): TypeValue<["s", A]> {
         return new ComplexValue(this.type, _w => this.formula.valuation(m, _w, g));
     }
+    freeVariables(): Variable<Type>[] {
+        return this.formula.freeVariables();
+    }
+    replace<B extends Type>(search: Variable<B>, replacer: Formula<B>): Formula<["s", A]> {
+        return new Up(this.formula.replace(search, replacer), this.type);
+    }
+    reduction(): Formula<["s", A]> {
+        return new Up(this.formula, this.type);
+    }
     toString() {
         return "↑" + this.formula.toString();
     };
@@ -255,6 +403,19 @@ class Down<A extends Type> implements Formula<A> {
     }
     valuation(m: Model, w: Situation, g: Assignment): TypeValue<A> {
         return apply(this.formula.valuation(m, w, g), w);
+    }
+    freeVariables(): Variable<Type>[] {
+        return this.formula.freeVariables();
+    }
+    replace<B extends Type>(search: Variable<B>, replacer: Formula<B>): Formula<A> {
+        return new Down(this.formula.replace(search, replacer), this.type);
+    }
+    reduction(): Formula<A> {
+        // 簡約して、アップになったら消す
+        let formula = this.formula.reduction();
+        if (formula instanceof Up) 
+            return formula.formula;
+        return new Down(formula, this.type);
     }
     toString() {
         return "↓" + this.formula.toString();
@@ -273,6 +434,28 @@ class Lambda<A extends Type, B extends Type> implements Formula<[A, B]> {
     valuation(m: Model, w: Situation, g: Assignment): TypeValue<[A, B]> {
         return new ComplexValue(this.type, d => this.formula.valuation(m, w, assign(g, this.variable, d)));
     }
+    freeVariables(): Variable<Type>[] {
+        return this.formula.freeVariables().filter(x => x.name !== this.variable.name);
+    }
+    replace<C extends Type>(search: Variable<C>, replacer: Formula<C>): Formula<[A, B]> {
+        // 置き換えたいののなかの自由出現と束縛変数の名前が衝突してたら
+        if (replacer.freeVariables().some(x => x.name === this.variable.name)) {
+            //衝突しない名前を模索して
+            let alt = "_" + this.variable.name;
+            while (replacer.freeVariables().some(x => x.name === this.variable.name)) alt = "_" + alt;
+            //置き換える
+            return new Lambda(
+                new Variable(alt, this.variable.type),
+                this.formula.replace(this.variable, new Variable(alt, this.variable.type)).replace(search, replacer),
+                this.type
+            );
+        }
+        //問題なければそのまま再帰
+        return new Lambda(this.variable, this.formula.replace(search, replacer), this.type);
+    }
+    reduction(): Formula<[A, B]> {
+        return new Lambda(this.variable, this.formula, this.type);
+    }
     toString() {
         return "λ" + this.variable.toString() + "." + this.formula.toString();
     };
@@ -290,12 +473,25 @@ class Apply<A extends Type, B extends Type> implements Formula<B> {
     valuation(m: Model, w: Situation, g: Assignment): TypeValue<B> {
         return apply(this.formula0.valuation(m, w, g), (this.formula1.valuation(m, w, g)));
     }
+    freeVariables(): Variable<Type>[] {
+        return [...this.formula0.freeVariables(), ...this.formula1.freeVariables()];
+    }
+    replace<A extends Type>(search: Variable<A>, replacer: Formula<A>): Formula<B> {
+        return new Apply(this.formula0.replace(search, replacer), this.formula1.replace(search, replacer), this.type);
+    }
+    reduction(): Formula<B> {
+        // 関数側を簡約して、ラムダになったら置き換えして、また簡約
+        let formula0 = this.formula0.reduction();
+        if (formula0 instanceof Lambda) 
+            return formula0.formula.replace(formula0.variable, this.formula1).reduction();
+        return new Apply(formula0, this.formula1.reduction(), this.type);
+    }
     toString() {
         return this.formula0.toString() + "(" + this.formula1.toString() + ")";
     };
 }
 
-function equals(m: Model, a: TypeValue<Type>, b: TypeValue<Type>): boolean {
+function equals(a: TypeValue<Type>, b: TypeValue<Type>): boolean {
     if (a.type === "t")
         return b.type === "t" && a.value === b.value;
     if (a.type === "e")
@@ -305,7 +501,8 @@ function equals(m: Model, a: TypeValue<Type>, b: TypeValue<Type>): boolean {
 
     if (b.type === "t" || b.type === "e" || b.type === "s") return false;
 
-    return m.interpretationDomain(a.type[0]).every(x => equals(m, apply(a, x), apply(b, x)));
+    throw new Error("関数同士の比較は未対応（モデルを見なきゃいけないので面倒）");
+    //return m.interpretationDomain(a.type[0]).every(x => equals(m, apply(a, x), apply(b, x)));
 }
 
 function apply<A extends Type, B extends Type>(func: ComplexValue<A, B>, x: TypeValue<A>) {
@@ -330,7 +527,7 @@ class Model {
         // bbのaa.lengthタプル（全組み合わせ）の配列を作る
         const table: TypeValue<A[1]>[][] = aa.reduce((prev: TypeValue<A[1]>[][]) => bb.map(b => prev.map(t => [b, ...t, b])).reduce((a, b) => a.concat(b), []), [[]]);
 
-        return table.map(t => new ComplexValue(type, (x: TypeValue<A[0]>): TypeValue<A[1]> => t[aa.findIndex(y => equals(this, x, y))]));
+        return table.map(t => new ComplexValue(type, (x: TypeValue<A[0]>): TypeValue<A[1]> => t[aa.findIndex(y => equals(x, y))]));
     }
 }
 
@@ -343,7 +540,7 @@ function assign<A extends Type>(
 }
 
 interface Expression<Categoly extends string, T extends Type> {
-    transrate: () => Formula<T>;
+    translate: () => Formula<T>;
     readonly categoly: Categoly;
 }
 
@@ -355,7 +552,7 @@ class ProperNoun implements Expression<"T", [["s", ["e", "t"]], "t"]> {
         this.literal = literal;
         this.constant = constant;
     }
-    transrate() {
+    translate() {
         // λX.(↓X)(constant)
         return new Lambda(
             new Variable("X", ["s", ["e", "t"]]),
@@ -381,7 +578,7 @@ class CommonNoun implements Expression<"CN", ["e", "t"]> {
         this.literal = literal;
         this.constant = constant;
     }
-    transrate() {
+    translate() {
         return this.constant;
     }
     toString() {
@@ -397,7 +594,7 @@ class Intransitive implements Expression<"IV", ["e", "t"]> {
         this.literal = literal;
         this.constant = constant;
     }
-    transrate() {
+    translate() {
         return this.constant;
     }
     toString() {
@@ -414,11 +611,11 @@ class SubjectIntransitive implements Expression<"t", "t"> {
         this.subject = subject;
         this.intransitive = intransitive;
     }
-    transrate() {
+    translate() {
         //α (↑δ)
         return new Apply(
-            this.subject.transrate(),
-            new Up(this.intransitive.transrate(), ["s", ["e", "t"]]),
+            this.subject.translate(),
+            new Up(this.intransitive.translate(), ["s", ["e", "t"]]),
             "t");
     }
     toString() {
@@ -435,11 +632,11 @@ class ObjectTransitive implements Expression<"IV", ["e", "t"]> {
         this.object = object;
         this.transitive = transitive;
     }
-    transrate() {
+    translate() {
         //δ (↑β)
         return new Apply(
-            this.transitive.transrate(),
-            new Up(this.object.transrate(), ["s", [["s", ["e", "t"]], "t"]]),
+            this.transitive.translate(),
+            new Up(this.object.translate(), ["s", [["s", ["e", "t"]], "t"]]),
             ["e", "t"]);
     }
     toString() {
@@ -453,15 +650,15 @@ class Every implements Expression<"T", [["s", ["e", "t"]], "t"]> {
     constructor(literal: string, commonNoun: Expression<"CN", ["e", "t"]>) {
         this.commonNoun = commonNoun;
     }
-    transrate() {
-        // λX ∀x (commonNoun.transrate(x)⇒↓X(x))
+    translate() {
+        // λX ∀x (commonNoun.translate(x)⇒↓X(x))
         return new Lambda(
             new Variable("X", ["s", ["e", "t"]]),
             new All(
                 new Variable("x", "e"),
                 new If(
                     new Apply(
-                        this.commonNoun.transrate(),
+                        this.commonNoun.translate(),
                         new Variable("x", "e"),
                         "t"),
                     new Apply(
@@ -487,12 +684,19 @@ const model = new Model([j, m], [new Situation("w0")]);
 
 const john = new ProperNoun("ジョン", new Constant("j", "e", w => j));
 
-const hashiru = new Intransitive("走る", new Constant("RUN", ["e", "t"], (w => new ComplexValue(["e", "t"], (e) => new Truth(equals(model, e, j))))));
+const hashiru = new Intransitive("走る", new Constant("RUN", ["e", "t"], (w => new ComplexValue(["e", "t"], (e) => new Truth(equals(e, j))))));
 
 const JohnGaHashiru = new SubjectIntransitive(john, hashiru);
 
+console.log(">JohnGaHashiru.toString()");
 console.log(JohnGaHashiru.toString()); //ジョンが走る
 
-console.log(JohnGaHashiru.transrate().toString()); // λX.↓X(j)(↑RUN)
 
-console.log(JohnGaHashiru.transrate().valuation(model, w0, g)); // Truth {type: "t", value: true}
+console.log(">JohnGaHashiru.translate().toString()");
+console.log(JohnGaHashiru.translate().toString()); // λX.↓X(j)(↑RUN)
+
+console.log(">JohnGaHashiru.translate().reduction().toString()");
+console.log(JohnGaHashiru.translate().reduction().toString()); // λX.↓X(j)(↑RUN)
+
+console.log(">JohnGaHashiru.translate().valuation(model, w0, g))");
+console.log(JohnGaHashiru.translate().valuation(model, w0, g)); // Truth {type: "t", value: true}
