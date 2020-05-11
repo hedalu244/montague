@@ -222,7 +222,7 @@ class May {
 class Up {
     constructor(expr, type) {
         this.sort = "↑";
-        this.type = ["s", type];
+        this.type = type;
         this.expr = expr;
     }
     valuation(m, w, g) {
@@ -321,6 +321,6 @@ const w0 = new Situation("w0");
 //適当な割り当て
 const g = (v) => model.interpretationDomain(v.type)[0];
 const model = new Model([j, m], [new Situation("w0")]);
-const run = new Constant("run", ["e", "t"], (w => new ComplexValue(["e", "t"], (e) => new Truth(equals(model, e, j)))));
-const john = new Lambda(new Variable("X", ["e", "t"]), new Apply(new Variable("X", ["e", "t"]), new Constant("j", "e", w => g), "t"), [["e", "t"], "t"]);
+const run = new Up(new Constant("run", ["e", "t"], (w => new ComplexValue(["e", "t"], (e) => new Truth(equals(model, e, j))))), ["s", ["e", "t"]]);
+const john = new Lambda(new Variable("X", ["s", ["e", "t"]]), new Apply(new Down(new Variable("X", ["s", ["e", "t"]]), ["e", "t"]), new Constant("j", "e", w => j), "t"), [["s", ["e", "t"]], "t"]);
 console.log(new Apply(john, run, "t").valuation(model, w0, g));

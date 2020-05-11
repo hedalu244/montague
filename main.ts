@@ -234,8 +234,8 @@ class Up<A extends Type> implements ME<["s", A]> {
     readonly sort = "↑";
     readonly type: ["s", A];
     readonly expr: ME<A>;
-    constructor(expr: ME<A>, type: A) {
-        this.type = ["s", type];
+    constructor(expr: ME<A>, type: ["s", A]) {
+        this.type = type;
         this.expr = expr;
     }
     valuation(m: Model, w: Situation, g: Assignment): TypeValue<["s", A]> {
@@ -350,8 +350,8 @@ const g: Assignment = (v) => model.interpretationDomain(v.type)[0];
 
 const model = new Model([j, m], [new Situation("w0")])
 
-const run = new Constant("run", ["e", "t"], (w => new ComplexValue(["e", "t"], (e) => new Truth(equals(model, e, j)) )));
+const run = new Up(new Constant("run", ["e", "t"], (w => new ComplexValue(["e", "t"], (e) => new Truth(equals(model, e, j)) ))), ["s", ["e", "t"]]);
 
-const john = new Lambda(new Variable("X", ["e", "t"]), new Apply(new Variable("X", ["e", "t"]), new Constant("j", "e", w=>g), "t"), [["e", "t"], "t"]);
+const john = new Lambda(new Variable("X", ["s", ["e", "t"]]), new Apply(new Down(new Variable("X", ["s", ["e", "t"]]), ["e", "t"]), new Constant("j", "e", w=>j), "t"), [["s", ["e", "t"]], "t"]);
 
 console.log(new Apply(john, run, "t").valuation(model, w0, g));
